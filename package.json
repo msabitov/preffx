@@ -1,0 +1,62 @@
+{
+    "name": "preffx",
+    "version": "0.1.0",
+    "description": "Self-confident DOM reactivity",
+    "author": "Marat Sabitov",
+    "license": "Apache-2.0",
+    "type": "module",
+    "scripts": {
+        "build": "rollup -c",
+        "test": "vitest"
+    },
+    "keywords": [
+        "preffx",
+        "preact",
+        "signals",
+        "ui",
+        "user interface",
+        "front-end",
+        "framework"
+    ],
+    "exports": {
+        ".": {
+            "types": "./dist/types/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.js"
+        },
+        "./jsx-runtime": {
+            "types": "./dist/types/jsx-runtime.d.ts",
+            "import": "./dist/jsx-runtime.js",
+            "require": "./dist/jsx-runtime.js"
+        },
+        "./jsx-dev-runtime": {
+            "types": "./dist/types/jsx-dev-runtime.d.ts",
+            "import": "./dist/jsx-dev-runtime.js",
+            "require": "./dist/jsx-dev-runtime.js"
+        }
+    },
+    "dependencies": {
+        "@preact/signals-core": "^1.14.2"
+    },
+    "devDependencies": {
+        "@rollup/plugin-terser": "^1.0.0",
+        "@rollup/plugin-typescript": "^12.3.0",
+        "csstype": "^3.2.3",
+        "rollup": "^4.59.0",
+        "rollup-plugin-cleaner": "^1.0.0",
+        "tslib": "^2.8.1",
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.0"
+    },
+    "files": [
+        "LICENSE",
+        "README.md",
+        "package.json",
+        "dist"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://sourcecraft.dev/msabitov/preffx"
+    },
+    "homepage": "https://effnd.tech/preffx/"
+}
