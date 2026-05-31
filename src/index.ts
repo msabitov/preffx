@@ -1,6 +1,6 @@
-import type { PC, APC } from './types';
+import type { PC, APC, PreffXRootParams } from './types';
 import { node } from './reactive/node';
-import { component, Fragment } from './reactive/component';
+import { component, setRootState, Fragment } from './reactive/component';
 import { childrenEffects } from './reactive/children';
 import { destroy, isArray, mount } from './utils';
 
@@ -45,7 +45,7 @@ export function h(
 /**
  * Create PreffX root
  */
-export function createRoot(node: ParentNode) {
+export function createRoot(node: ParentNode, params?: PreffXRootParams) {
     let root: ParentNode;
     if (node == document) {
         root = document.documentElement;
@@ -60,6 +60,7 @@ export function createRoot(node: ParentNode) {
          * @param content - JSX to render
          */
         mount(content: any) {
+            setRootState(params);
             children = content;
             clearEffects = childrenEffects({
                 root, children

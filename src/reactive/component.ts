@@ -5,25 +5,49 @@ import {
     effect as preactEffect,
     signal as preactSignal,
     untracked, 
-    Signal} from '@preact/signals-core';
+    Signal,
+    action
+} from '@preact/signals-core';
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
     isPromise, resolveDeepValue, resolveDeepRawValue, resolveValue, TPreffXItem, 
 } from '../utils';
 import { childrenEffects } from './children';
-import { PC, SignalWithPrev } from '../types';
+import { PC, PreffXRootParams, SignalWithPrev } from '../types';
+
+type StateWithComponentIndex = PreffXRootParams & {index: number;};
+
+const defaultRootState: StateWithComponentIndex = {
+    // component context
+    context: {},
+    // component index
+    index: 0
+};
 
 // global state
-const state = {
-    // prefix
-    prefix: 'fx',
-    // component context
-    ctx: {},
-    // components count
-    counter: 0,
-    // component constructors
-    constructors: new Map()
+const state: {
+    /**
+     * Count of roots
+     */
+    count: number;
+    /**
+     * Root state
+     */
+    root: StateWithComponentIndex;
+} = {
+    count: 0,
+    root: {index: 0}
 };
+
+export const setRootState = (rootState: PreffXRootParams = {}) => {
+    state.root = {
+        ...defaultRootState,
+        ...rootState,
+        index: 0
+    };
+    state.count++;
+    if (!state.root.prefix) state.root.prefix = 'fx' + state.count + '_';
+}
 
 // utils
 const isError = (val: any) => val instanceof Error;
@@ -63,6 +87,20 @@ const Catch: PC<{
             return children;
         }
     })
+};
+
+const Defer: PC<{
+    initial: any;
+    value: Signal<any>;
+}> = ({ value, initial }, { signal, effect }) => {
+    const defered = signal(initial);
+
+    effect(() => {
+        const resolved = resolveDeepRawValue(value);
+        if (!isPromise(resolved)) defered.value = resolved;
+    });
+
+    return defered;
 };
 
 const For: PC<{
@@ -140,13 +178,11 @@ const Portal: PC<{
     root: HTMLElement;
     children?: any | any[];
 }> = ({root, children}, {
-    onMount, onDestroy
+    onDestroy
 }) => {
     if (root) {
         const clear = childrenEffects({ root, children });
-        onMount(() => {
-            mount(children);
-        });
+        mount(children);
 
         onDestroy(() => {
             clear();
@@ -220,18 +256,16 @@ export function component({
     props: any;
 }) {
     // prepare ctx
-    const parentCtx = {...state.ctx};
+    const parentState = state.root;
+    const parentCtx = {...parentState.context};
     const context = {...parentCtx};
-    state.ctx = context;
+    parentState.context = context;
     // counters
-    let componentPrefix = state.prefix + (
-        state.constructors.get(type) || state.constructors.set(
-            type, (++state.counter).toString(16)).get(type)
-        );
+    let componentPrefix = parentState.prefix + (++parentState.index).toString(16) + '-';
     const counters = {
         id: 0
     };
-    const id = () => componentPrefix + '-' + (counters.id++).toString(16);
+    const id = () => componentPrefix + (counters.id++).toString(16);
 
     // prepare lifecycle callbacks
     const callbacks: {
@@ -262,15 +296,15 @@ export function component({
     };
     const computed = (fn: () => any) => {
         const rawSignal = preactComputed(() => {
-            const prevCtx = {...state.ctx};
-            state.ctx = context;
+            const prevCtx = {...parentState.context};
+            parentState.context = context;
             let result;
             try {
                 result = fn();
             } catch (e) {
                 result = e;
             }
-            state.ctx = prevCtx;
+            parentState.context = prevCtx;
             return result;
         })  as SignalWithPrev;;
 
@@ -293,11 +327,11 @@ export function component({
         context,
         id,
         effect: preactEffect,
-        untracked, batch,
+        untracked, batch, createModel, action,
         // lifecycle
         onMount, onDestroy,
         // special components
-        Portal, Catch, For
+        Portal, Catch, For, Defer
     };
     const componentModel = new ComponentModel({
         type, props, utils

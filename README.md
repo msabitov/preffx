@@ -86,7 +86,7 @@ export const App: PC = (props, { signal }) => {
 import type { PC } from 'preffx';
 
 export const App: PC = (props, { onMount, onDestroy }) => {
-    const count = signal(0);
+    const { count } = props;
 
     onMount(() => {
         // some mount logic
@@ -134,13 +134,21 @@ export const App: PC = (props, { For }) => {
 
 ```tsx
 import type { PC } from 'preffx';
-import { AnotherComponent } from './components';
 
-export const App: PC = (props, { context }) => {
-    // get value from context
-    const valueFromContext = context.someValue;
-    // add value for children context
-    context.forChild = 'Another value';
+const contextKey = 'ctx-counter';
+
+const AnotherComponent: PC = (props, { context }) => {
+    // read context
+    const counter = context[contextKey];
+    return <span>
+        {counter}
+    </span>;
+};
+
+export const App: PC = (props, { signal, context }) => {
+    const counter = signal(0);
+    // modify context
+    context[contextKey] = counter;
     return <p>
         {valueFromContext}
         <AnotherComponent />
@@ -180,5 +188,58 @@ export const App: PC = (props, { Catch }) => {
             <AnotherComponent />
         </Catch>
     </div>;
+};
+```
+
+- Defered value handling:
+
+```tsx
+import type { PC } from 'preffx';
+import { AsyncComponent } from './components';
+
+export const App: PC = (props, { computed, Defer }) => {
+    const def = computed(() => <AsyncComponent id={props.id} />);
+    return <Defer
+        value={def}
+        initial={<div>Please wait</div>}
+    />;
+};
+```
+
+- Portal:
+
+```tsx
+import type { PC } from 'preffx';
+
+export const App: PC = (props, { Portal }) => {
+    return <>
+        <span>Some text inside current tree</span>
+        <Portal root={document.getElementById('portal')}>
+            <div>Text inside portal</div>
+        </Portal>
+    </>;
+};
+```
+
+- Unique identifiers:
+
+```tsx
+import type { PC } from 'preffx';
+
+export const App: PC = (props, { id }) => {
+    // get unique id
+    const inputId = id();
+    return <>
+        <label>
+            Password:
+            <input
+                type="password"
+                aria-describedby={inputId}
+            />
+        </label>
+        <p id={inputId}>
+            The password should contain at least 18 characters
+        </p>
+    </>;
 };
 ```

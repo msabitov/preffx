@@ -5,6 +5,17 @@ import {
 } from "@preact/signals-core";
 import * as CSS from "csstype";
 
+export type PreffXRootParams = {
+    /**
+     * Prefix for unique ids
+     */
+    prefix?: string;
+    /**
+     * Root component context
+     */
+    context?: Record<string, any>;
+};
+
 export type SignalWithPrev<T = any> = Signal<T> & {prev: T | undefined};
 
 type PreffXContext = Record<string | symbol, any>;
@@ -78,6 +89,10 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
     Portal: PC<{
         root: HTMLElement;
         children?: any | any[];
+    }>;
+    Defer: PC<{
+        initial: any;
+        value: Signal<any>;
     }>;
 }
 
