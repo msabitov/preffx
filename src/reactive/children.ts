@@ -1,6 +1,6 @@
 import { batch, createModel, effect, signal } from '@preact/signals-core';
 import { destroy, mount, isPromise, isSignal, resolveDeepValue, isArray } from '../utils';
-import { SignalWithPrev } from 'types';
+import type { SignalWithPrev } from '../types';
 
 // only signal can be a reason to recomputation
 const deepReason = (arg: any): any => isSignal(arg) ? (

@@ -39,7 +39,16 @@ PreffX is a self-confident JS library for creating reactive DOM. It is inspired 
 
 ## Installation
 
-Try [Vite + PreffX](https://stackblitz.com/edit/vitejs-preffx?file=src%2FApp.tsx) demo
+You can use [degit](https://github.com/Rich-Harris/degit):
+
+```bash
+npx degit msabitov/vite-preffx preffx-starter 
+cd preffx-starter         
+npm install        
+npm run dev
+```
+
+You can also try [StackBlitz demo](https://stackblitz.com/edit/vitejs-preffx?file=src%2FApp.tsx)
 
 ## Examples
 
