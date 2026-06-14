@@ -17,12 +17,8 @@ const updateChildren = (root: HTMLElement, items: Node[]) => {
     const currentLength = currentChildNodes.length;
     const currentChildSet = new Set(currentChildNodes);
 
-    if (!nextLength) currentChildNodes.forEach((node) => {
-        root.removeChild(node);
-    });
-    else if (!currentLength) nextChildNodes.forEach((node) => {
-        root.append(node);
-    });
+    if (!nextLength) currentChildNodes.forEach((node) => root.removeChild(node));
+    else if (!currentLength) nextChildNodes.forEach((node) => root.append(node));
     else {
         nextChildNodes.forEach((val, ind) => {
             const current = root.childNodes[ind];

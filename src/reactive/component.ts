@@ -39,6 +39,8 @@ const state: {
     root: {index: 0}
 };
 
+const RADIX = 36;
+
 export const setRootState = (rootState: PreffXRootParams = {}) => {
     state.root = {
         ...defaultRootState,
@@ -261,11 +263,11 @@ export function component({
     const context = {...parentCtx};
     parentState.context = context;
     // counters
-    let componentPrefix = parentState.prefix + (++parentState.index).toString(16) + '-';
+    let componentPrefix = parentState.prefix + (++parentState.index).toString(RADIX) + '-';
     const counters = {
         id: 0
     };
-    const id = () => componentPrefix + (counters.id++).toString(16);
+    const id = () => componentPrefix + (counters.id++).toString(RADIX);
 
     // prepare lifecycle callbacks
     const callbacks: {

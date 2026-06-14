@@ -11,6 +11,7 @@ export default defineConfig({
     },
     oxc: {
         jsx: {
+            development: false,
             importSource: 'src/index',
             pragmaFrag: 'Fragment',
             pragma: 'h'

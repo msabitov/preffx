@@ -1499,6 +1499,124 @@ declare global {
             zoomAndPan?: string;
         }
 
+        interface AnnotationXMLAttributes extends MathMLAttributes {
+            encoding?: string;
+        }
+
+        interface AnnotationAttributes extends MathMLAttributes {
+            encoding?: string;
+        }
+
+        interface MathAttributes extends MathMLAttributes {
+            display?: 'block' | 'inline';
+        }
+
+        interface MErrorAttributes extends MathMLAttributes {
+        }
+
+        interface MFracAttributes extends MathMLAttributes {
+            linethickness?: string;
+        }
+
+        interface MIAttributes extends MathMLAttributes {
+            mathvariant?: 'normal';
+        }
+
+        interface MMultiscriptsAttributes extends MathMLAttributes {
+        }
+
+        interface MNAttributes extends MathMLAttributes {
+        }
+
+        interface MOAttributes extends MathMLAttributes {
+            accent?: boolean;
+            fence?: boolean;
+            form?: string;
+            largeop?: boolean;
+            lspace?: string;
+            maxsize?: string;
+            minsize?: string;
+            movablelimits?: boolean;
+            rspace?: string;
+            separator?: boolean;
+            stretchy?: boolean;
+            symmetric?: boolean;
+        }
+
+        interface MOverAttributes extends MathMLAttributes {
+            accent?: boolean;
+        }
+
+        interface MPaddedAttributes extends MathMLAttributes {
+            depth?: string;
+            height?: string;
+            lspace?: string;
+            voffset?: string;
+            width?: string;
+        }
+
+        interface MPhantomAttributes extends MathMLAttributes {
+        }
+
+        interface MPrescriptsAttributes extends MathMLAttributes {
+        }
+
+        interface MRootAttributes extends MathMLAttributes {
+        }
+
+        interface MRowAttributes extends MathMLAttributes {
+        }
+
+        interface MSAttributes extends MathMLAttributes {
+        }
+
+        interface MSpaceAttributes extends MathMLAttributes {
+            depth?: string;
+            height?: string;
+            width?: string;
+        }
+
+        interface MSqrtAttributes extends MathMLAttributes {
+        }
+
+        interface MStyleAttributes extends MathMLAttributes {
+        }
+
+        interface MSubAttributes extends MathMLAttributes {
+        }
+
+        interface MSubSupAttributes extends MathMLAttributes {
+        }
+
+        interface MSupAttributes extends MathMLAttributes {
+        }
+
+        interface MTableAttributes extends MathMLAttributes {
+        }
+
+        interface MTdAttributes extends MathMLAttributes {
+            columnspan?: string | number;
+            rowspan?: string | number;
+        }
+
+        interface MTextAttributes extends MathMLAttributes {
+        }
+
+        interface MTrAttributes extends MathMLAttributes {
+        }
+
+        interface MUnderAttributes extends MathMLAttributes {
+            accentunder?: boolean;
+        }
+
+        interface MUnderOverAttributes extends MathMLAttributes {
+            accent?: boolean;
+            accentunder?: boolean;
+        }
+
+        interface SemanticsAttributes extends MathMLAttributes {
+        }
+
         export interface IntrinsicElements {
             // HTML
             abbr: SignalAttrs<HTMLAttributes> & Properties<HTMLElement>;
@@ -1679,36 +1797,36 @@ declare global {
             view: SignalAttrs<SVGProps> & Properties<SVGViewElement>;
 
             // MathML
-            math: MathMLProps;
+            math: SignalAttrs<MathAttributes>;
 
-            'annotation-xml': MathMLProps;
-            annotation: MathMLProps;
-            merror: MathMLProps;
-            mfrac: MathMLProps;
-            mi: MathMLProps;
-            mmultiscripts: MathMLProps;
-            mn: MathMLProps;
-            mo: MathMLProps;
-            mover: MathMLProps;
-            mpadded: MathMLProps;
-            mphantom: MathMLProps;
-            mprescripts: MathMLProps;
-            mroot: MathMLProps;
-            mrow: MathMLProps;
-            ms: MathMLProps;
-            mspace: MathMLProps;
-            msqrt: MathMLProps;
-            mstyle: MathMLProps;
-            msub: MathMLProps;
-            msup: MathMLProps;
-            msubsup: MathMLProps;
-            mtable: MathMLProps;
-            mtd: MathMLProps;
-            mtext: MathMLProps;
-            mtr: MathMLProps;
-            munder: MathMLProps;
-            munderover: MathMLProps;
-            semantics: MathMLProps;
+            'annotation-xml': SignalAttrs<AnnotationXMLAttributes>;
+            annotation: SignalAttrs<AnnotationAttributes>;
+            merror: SignalAttrs<MErrorAttributes>;
+            mfrac: SignalAttrs<MFracAttributes>;
+            mi: SignalAttrs<MIAttributes>;
+            mmultiscripts: SignalAttrs<MMultiscriptsAttributes>;
+            mn: SignalAttrs<MNAttributes>;
+            mo: SignalAttrs<MOAttributes>;
+            mover: SignalAttrs<MOverAttributes>;
+            mpadded: SignalAttrs<MPaddedAttributes>;
+            mphantom: SignalAttrs<MPhantomAttributes>;
+            mprescripts: SignalAttrs<MPrescriptsAttributes>;
+            mroot: SignalAttrs<MRootAttributes>;
+            mrow: SignalAttrs<MRowAttributes>;
+            ms: SignalAttrs<MSAttributes>;
+            mspace: SignalAttrs<MSpaceAttributes>;
+            msqrt: SignalAttrs<MSqrtAttributes>;
+            mstyle: SignalAttrs<MStyleAttributes>;
+            msub: SignalAttrs<MSubAttributes>;
+            msup: SignalAttrs<MSupAttributes>;
+            msubsup: SignalAttrs<MSubSupAttributes>;
+            mtable: SignalAttrs<MTableAttributes>;
+            mtd: SignalAttrs<MTdAttributes>;
+            mtext: SignalAttrs<MTextAttributes>;
+            mtr: SignalAttrs<MTrAttributes>;
+            munder: SignalAttrs<MUnderAttributes>;
+            munderover: SignalAttrs<MUnderOverAttributes>;
+            semantics: SignalAttrs<SemanticsAttributes>;
         }
     }
 }
