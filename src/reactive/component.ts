@@ -132,7 +132,7 @@ const For: PC<{
         untracked(() => batch(() => arr.forEach((item) => {
             // recalculates with effect if item is Signal
             effect(() => {
-                const value = resolveDeepValue(item);
+                const value = resolveDeepRawValue(item);
                 // no cached value
                 if (!cache.peek().has(item)) {
                     cache.value = getNextCache(item, callback(value));

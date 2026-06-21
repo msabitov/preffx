@@ -77,21 +77,61 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
 
     // basic components
 
+    /**
+     * Render the list
+     */
     For: PC<{
+        /**
+         * List items
+         */
         items: Signal<any[]>;
+        /**
+         * Function that returns JSX for each item
+         * @param item - list item
+         */
         callback: (item: any) => any;
+        /**
+         * JSX content for empty list
+         */
         fallback: any;
     }>;
+    /**
+     * Catch errors
+     */
     Catch: PC<{
+        /**
+         * JSX of function that should be used when errors are catched
+         */
         fallback: any;
+        /**
+         * JSX content inside
+         */
         children?: any | any[];
     }>;
+    /**
+     * Render JSX outside the root
+     */
     Portal: PC<{
+        /**
+         * Portal root
+         */
         root: HTMLElement;
+        /*
+         * JSX content
+         */
         children?: any | any[];
     }>;
+    /**
+     * Defer value render
+     */
     Defer: PC<{
-        initial: any;
+        /**
+         * Initial value
+         */
+        initial?: any;
+        /**
+         * Deferred value
+         */
         value: Signal<any>;
     }>;
 }

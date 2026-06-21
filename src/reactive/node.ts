@@ -12,6 +12,7 @@ const resolveRef = (ref: Signal | ((node: Node | null) => void), value: Node | n
 const kebabCase = (str: string): string => str.replace(/[A-Z]/g, (v) => '-' + v.toLowerCase());
 const propVal = (prop: string, val: any) => `${kebabCase(prop)}:${'' + val};`
 const stringify = (obj: object): string => Object.entries(obj).reduce((acc, item) => acc + (item[1] ? propVal(item[0], item[1]) : ''), '');
+const isDefined = (arg: any) => arg !== null && arg !== undefined;
 
 // DOM
 const HTML = 'html';
@@ -179,7 +180,7 @@ const NodeModel = createModel<any, any>(({
             const attr = kebabCase(key);
             effect(() => {
                 const nextValue = resolveValue(val);
-                if (nextValue) {
+                if (isDefined(nextValue)) {
                     if (typeof nextValue === 'boolean') node.setAttribute(attr, '');
                     else node.setAttribute(attr, nextValue);
                 } else node.removeAttribute(attr);
@@ -187,14 +188,14 @@ const NodeModel = createModel<any, any>(({
         }
     });
     // className
-    if (className) {
+    if (isDefined(className)) {
         effect(() => {
             const nextValue = resolveValue(className);
             const strValue = Array.isArray(nextValue) ?
                 nextValue.filter(Boolean).join(' ') :
                 typeof nextValue === 'object' ? Object.entries(nextValue).reduce((acc, [k, v]) => acc + (v ? ' ' + k : ''), '') :
                 nextValue;
-            if (strValue) node.setAttribute('class', strValue + '');
+            if (isDefined(strValue)) node.setAttribute('class', strValue + '');
             else node.removeAttribute('class');
         });
     }

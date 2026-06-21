@@ -54,28 +54,30 @@ export function createRoot(node: ParentNode, params?: PreffXRootParams) {
     let clearEffects: Function;
     let children: any;
 
-    return {
+    return new Proxy({
         /**
          * Mount JSX
          * @param content - JSX to render
          */
         mount(content: any) {
-            setRootState(params);
             children = content;
             clearEffects = childrenEffects({
                 root, children
             });
-            // after mount
             mount(children);
         },
         /**
          * Destroy JSX
          */
         destroy() {
-            clearEffects?.();
-            // before destroy
             destroy(children);
+            clearEffects?.();
             root.replaceChildren();
         }
-    };
+    }, {
+        get(target, prop, receiver) {
+            if (prop === 'mount') setRootState(params);
+            return Reflect.get(target, prop, receiver);
+        }
+    });
 };

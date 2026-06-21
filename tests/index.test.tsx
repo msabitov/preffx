@@ -46,8 +46,31 @@ export const ReactiveComponent: PC<{
                 children: ['+']
             })
         ] 
-     });
-  };
+    });
+};
+
+export const ForComponent: PC<{
+    initialItems: ({
+        id: number;
+        name: string;
+    })[];
+    useProps?: boolean;
+    fallback?: any;
+}> = (
+    { initialItems, useProps, fallback },
+    { signal, For },
+) => {
+    const items = useProps ? initialItems : signal(initialItems);
+
+    return h(For, {
+        items,
+        callback: (i) => h('div', {
+            class: i.id,
+            children: [i.name]
+        }),
+        fallback
+    });
+};
 
 describe('PreffX root', () => {
     let rootElement: HTMLDivElement;
@@ -56,6 +79,10 @@ describe('PreffX root', () => {
         rootElement = globalThis.document.createElement('div');
         rootElement.id = 'app';
         globalThis.document.body.appendChild(rootElement);
+
+        return () => {
+            rootElement.remove();
+        };
     });
 
     test('create root', () => {
@@ -87,6 +114,10 @@ describe('Reactivity', () => {
         rootElement = globalThis.document.createElement('div');
         rootElement.id = 'app';
         globalThis.document.body.appendChild(rootElement);
+
+        return () => {
+            rootElement.remove();
+        };
     });
 
     test('signal', async () => {
@@ -148,5 +179,126 @@ describe('Reactivity', () => {
 
         expect(valueFromCallback).toBe(initialValue + 1);
         root.destroy();
+    });
+});
+
+describe('Special components', () => {
+    let rootElement: HTMLDivElement;
+
+    beforeAll(() => {
+        rootElement = globalThis.document.createElement('div');
+        rootElement.id = 'app';
+        globalThis.document.body.appendChild(rootElement);
+    });
+
+    describe('Fragment', () => {
+        test('With children', async () => {
+            const root = createRoot(rootElement);
+            root.mount(h(
+                Fragment, {
+                    children: [
+                        h('p', {
+                            children: 'The first paragraph'
+                        }),
+                        h('p', {
+                            children: 'The second paragraph'
+                        })
+                    ]
+                }
+            ));
+            await tick();
+
+            expect(rootElement.innerHTML).toBe('<p>The first paragraph</p><p>The second paragraph</p>');
+            root.destroy();
+        });
+
+        test('Empty', async () => {
+            const root = createRoot(rootElement);
+            root.mount(h(
+                Fragment, {
+                    children: []
+                }
+            ));
+            await tick();
+
+            expect(rootElement.innerHTML).toBe('');
+            root.destroy();
+        });
+    });
+
+    describe('For', () => {
+        test('Signal items', async () => {
+            const root = createRoot(rootElement);
+            const initialItems = [
+                {
+                    id: 0,
+                    name: 'Bar'
+                },
+                {
+                    id: 1,
+                    name: 'Foo'
+                }, {
+                    id: 2,
+                    name: 'Baz'
+                }
+            ];
+            root.mount(h(
+                ForComponent, {
+                    initialItems,
+                    useProps: false
+                }
+            ));
+            await tick();
+
+            expect(rootElement.innerHTML).toBe(initialItems.reduce(
+                (acc, item) => acc += `<div class="${item.id}">${item.name}</div>`, '')
+            );
+            root.destroy();
+        });
+
+        test('Array items', async () => {
+            const root = createRoot(rootElement);
+            const initialItems = [
+                {
+                    id: 0,
+                    name: 'Bar'
+                },
+                {
+                    id: 1,
+                    name: 'Foo'
+                }, {
+                    id: 2,
+                    name: 'Baz'
+                }
+            ];
+            root.mount(h(
+                ForComponent, {
+                    initialItems,
+                    useProps: true
+                }
+            ));
+            await tick();
+    
+            expect(rootElement.innerHTML).toBe(initialItems.reduce(
+                (acc, item) => acc += `<div class="${item.id}">${item.name}</div>`, '')
+            );
+            root.destroy();
+        });
+
+        test('Fallback', async () => {
+            const root = createRoot(rootElement);
+            const initialItems = [];
+            const fallback = 'No items';
+            root.mount(h(
+                ForComponent, {
+                    initialItems,
+                    fallback
+                }
+            ));
+            await tick();
+    
+            expect(rootElement.innerHTML).toBe(fallback);
+            root.destroy();
+        });
     });
 });
