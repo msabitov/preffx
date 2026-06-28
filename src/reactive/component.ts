@@ -270,15 +270,16 @@ export function component({
     const id = () => componentPrefix + (counters.id++).toString(RADIX);
 
     // prepare lifecycle callbacks
-    const callbacks: {
-        mount?: () => void;
-        destroy?: () => void;
+
+    const callbacks: { 
+        mount: Set<Function>; 
+        destroy: Set<Function>;
     } = {
-        mount: undefined,
-        destroy: undefined
+        mount: new Set(), 
+        destroy: new Set(),
     };
-    const onMount = (fn: () => void) => callbacks.mount = fn;
-    const onDestroy = (fn: () => void) => callbacks.destroy = fn;
+    const onMount = (fn: () => void | Promise<void>) => callbacks.mount.add(fn);
+    const onDestroy = (fn: () => void | Promise<void>) => callbacks.destroy.add(fn);
 
     const signal = (arg: any) => {
         const rawSignal = preactSignal(arg) as SignalWithPrev;
@@ -339,12 +340,12 @@ export function component({
         type, props, utils
     }) as unknown as (TPreffXItem & {root: any;});
     const componentRoot = componentModel.root;
-    onDestroyCallback(componentRoot, () => {
-        callbacks.destroy?.();
-        componentModel[Symbol.dispose]();
-    });
     onMountCallback(componentRoot, () => {
-        callbacks.mount?.();
+        callbacks.mount.forEach((fn) => fn());
+    });
+    onDestroyCallback(componentRoot, () => {
+        callbacks.destroy.forEach((fn) => fn());
+        componentModel[Symbol.dispose]();
     });
 
     return componentRoot;

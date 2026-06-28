@@ -1,6 +1,6 @@
 {
     "name": "preffx",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "description": "Self-confident DOM reactivity",
     "author": "Marat Sabitov",
     "license": "Apache-2.0",
