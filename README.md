@@ -252,3 +252,28 @@ export const App: PC = (props, { id }) => {
     </>;
 };
 ```
+
+- Simple routing:
+
+```tsx
+import type { PC } from 'preffx';
+
+export const App: PC = (props, { computed, url }) => {
+    const routeContent = computed(() => {
+        // depends on url signal
+        switch(url.value.pathname) {
+            case '/home':
+                return <div>Home page content</div>
+            case '/contacts':
+                return <div>Contacts page content</div>;
+            default:
+                return <div>Other page content</div>
+        }
+    });
+    return <div>
+        <a href='/home'>Home</a>
+        <a href='/contacts'>Contacts</a>
+        {routeContent}
+    </div>;
+};
+```

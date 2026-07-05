@@ -4,13 +4,13 @@ import {
     createModel,
     effect as preactEffect,
     signal as preactSignal,
-    untracked, 
+    untracked,
     Signal,
     action
 } from '@preact/signals-core';
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
-    isPromise, resolveDeepValue, resolveDeepRawValue, resolveValue, TPreffXItem, 
+    isPromise, resolveDeepValue, resolveDeepRawValue, resolveValue, TPreffXItem,
 } from '../utils';
 import { childrenEffects } from './children';
 import { PC, PreffXRootParams, SignalWithPrev } from '../types';
@@ -40,6 +40,30 @@ const state: {
 };
 
 const RADIX = 36;
+let URL_WATCHERS = 0;
+
+const urlSignal = preactSignal(new URL(globalThis.location.href), {
+    watched: () => {
+        URL_WATCHERS++;
+    },
+    unwatched: () => {
+        URL_WATCHERS--;
+    }
+});
+const readonlyUrl = preactComputed(() => urlSignal.value);
+
+globalThis.navigation?.addEventListener('navigate', (event) => {
+    const nextUrl = new URL(event.destination.url);
+    const currentUrl = readonlyUrl.peek();
+    // if the navigation is cross-origin
+    const isCrossDomain = nextUrl.origin !== currentUrl.origin;
+    if (isCrossDomain) return;
+    else if (URL_WATCHERS) {
+        // custom handling
+        event.preventDefault();
+        urlSignal.value = nextUrl;
+    }
+});
 
 export const setRootState = (rootState: PreffXRootParams = {}) => {
     state.root = {
@@ -331,6 +355,8 @@ export function component({
         id,
         effect: preactEffect,
         untracked, batch, createModel, action,
+        // routing
+        url: readonlyUrl,
         // lifecycle
         onMount, onDestroy,
         // special components

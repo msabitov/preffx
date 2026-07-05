@@ -232,6 +232,8 @@ export const node = ({
     const {
         $ref,
         $ns,
+        $onMount,
+        $onDestroy,
         children,
         ...clearProps
     } = props;
@@ -248,6 +250,13 @@ export const node = ({
     onMountCallback(node, () => {
         resolveRef($ref, node);
         mount(children);
+        if ($onMount) {
+            try {
+                $onMount(node);
+            } catch (e) {
+                console.error(`Node $onMount error: `, e);
+            }
+        }
     });
 
     onDestroyCallback(node, () => {
@@ -255,6 +264,14 @@ export const node = ({
         clearChildrenEffects();
         clearNodeEffects();
         resolveRef($ref);
+        if ($onDestroy) {
+            try {
+                $onDestroy(node);
+            } catch (e) {
+                console.error(`Node $onDestroy error: `, e);
+            }
+        }
+        (node as unknown as Element).remove();
     });
 
     return node;

@@ -39,7 +39,7 @@ export const mount = (arg: any) => {
     arg && arg[mountSymbol] && arg[mountSymbol]();
 }
 export const destroy = (arg: any) => {
-    arg && arg[destroySymbol] && arg[destroySymbol]();
     if (isSignal(arg)) destroy(arg.value);
     else if (isArray(arg)) arg.forEach(destroy);
+    arg && arg[destroySymbol] && arg[destroySymbol]();
 };

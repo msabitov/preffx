@@ -1,7 +1,8 @@
 import {
     Signal, signal, computed,
     effect, batch, untracked,
-    action, createModel
+    action, createModel,
+    ReadonlySignal
 } from "@preact/signals-core";
 import * as CSS from "csstype";
 
@@ -61,6 +62,10 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
      * Get unique id
      */
     id: () => string;
+    /**
+     * Page URL
+     */
+    url: ReadonlySignal<URL>
 
     // lifecycle
 
@@ -402,6 +407,10 @@ declare global {
             [K in keyof OmitMethods<T> as K extends string ? `\$${K}` : K]: T[K] | Signal<T[K]>;
         } & {
             /**
+             * Element children
+             */
+            children?: any | any[];
+            /**
              * Element namespace
              */
             $ns: 'svg' | 'mathml';
@@ -409,6 +418,16 @@ declare global {
              * Element reference
              */
             $ref: Signal<T> | ((ref: T | null) => void);
+            /**
+             * On mount callback
+             * @param ref - element
+             */
+            $onMount: (ref: T) => (any | Promise<any>);
+            /**
+             * On destroy callback
+             * @param ref - element
+             */
+            $onDestroy: (ref: T) => (any | Promise<any>);
         }>;
 
         type SignalAttrs<T extends Record<string, any>> = Partial<{
