@@ -277,3 +277,31 @@ export const App: PC = (props, { computed, url }) => {
     </div>;
 };
 ```
+
+- i18n example:
+
+```tsx
+import type { PC } from 'preffx';
+
+const dictionary = {
+    en: {
+        openProfile: 'Open profile',
+        showStats: 'Show statistics'
+    },
+    ru: {
+        openProfile: 'Открыть профиль',
+        showStats: 'Показать статистику'
+    }
+};
+
+export const App: PC = (props, { computed, lang }) => {
+    const captions = computed(() => {
+        // depends on lang signal
+        return dictionary[lang.value] || dictionary.en;
+    });
+    return <div>
+        <button>{captions.openProfile}</button>
+        <button>{captions.showStats}</button>
+    </div>;
+};
+```

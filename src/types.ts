@@ -65,7 +65,27 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
     /**
      * Page URL
      */
-    url: ReadonlySignal<URL>
+    url: ReadonlySignal<URL>;
+    /**
+     * Language signal — tracks <html lang="..."> attribute
+     */
+    lang: ReadonlySignal<string>;
+    /**
+     * Set language — updates <html lang="..."> attribute and lang signal
+     * @param value - language code (e.g. 'en', 'ru')
+     */
+    setLang: (value: string) => void;
+    /**
+     * useState-like hook
+     * @param initial — initial value or factory function
+     */
+    state: <T>(initial: T | (() => T)) => [ReadonlySignal<T>, (value: T | ((prev: T) => T)) => void];
+    /**
+     * useReducer-like hook
+     * @param fn — reducer function
+     * @param init — initial state or factory function
+     */
+    reducer: <S, A>(fn: (state: S, action: A) => S, init: S | (() => S)) => [ReadonlySignal<S>, (action: A) => void];
 
     // lifecycle
 

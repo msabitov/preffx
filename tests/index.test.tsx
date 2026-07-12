@@ -133,7 +133,7 @@ const DeferComponent: PC<{
     const value = isSignal ? signal(deferredValue) : deferredValue;
     
     if (isSignal && isPromise) {
-        deferredValue.then((resolved) => value.value = resolved);
+        deferredValue.then((resolved: string) => value.value = resolved);
     }
 
     return h(Defer, {
@@ -451,7 +451,7 @@ describe('Special components', () => {
 
         test('Fallback', async () => {
             const root = createRoot(rootElement);
-            const initialItems = [];
+            const initialItems: string[] = [];
             const fallback = 'No items';
             root.mount(
                 ForComponent, {

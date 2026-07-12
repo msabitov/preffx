@@ -6,7 +6,8 @@ import {
     signal as preactSignal,
     untracked,
     Signal,
-    action
+    action,
+    SignalOptions
 } from '@preact/signals-core';
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
@@ -41,7 +42,9 @@ const state: {
 
 const RADIX = 36;
 let URL_WATCHERS = 0;
+let LANG_WATCHERS = 0;
 
+// url
 const urlSignal = preactSignal(new URL(globalThis.location.href), {
     watched: () => {
         URL_WATCHERS++;
@@ -51,7 +54,6 @@ const urlSignal = preactSignal(new URL(globalThis.location.href), {
     }
 });
 const readonlyUrl = preactComputed(() => urlSignal.value);
-
 globalThis.navigation?.addEventListener('navigate', (event) => {
     const nextUrl = new URL(event.destination.url);
     const currentUrl = readonlyUrl.peek();
@@ -64,6 +66,35 @@ globalThis.navigation?.addEventListener('navigate', (event) => {
         urlSignal.value = nextUrl;
     }
 });
+
+// lang
+const htmlElement = globalThis.document?.documentElement;
+const langSignal = preactSignal(htmlElement?.getAttribute('lang') || '', {
+    watched: () => {
+        LANG_WATCHERS++;
+    },
+    unwatched: () => {
+        LANG_WATCHERS--;
+    }
+});
+
+const readonlyLang = preactComputed(() => langSignal.value);
+const setLang = (value: string) => {
+    htmlElement?.setAttribute('lang', value);
+};
+if (htmlElement) {
+    const observer = new MutationObserver((mutations) => {
+        if (!LANG_WATCHERS) return;
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'lang') {
+                const nextLang = htmlElement.getAttribute('lang') || '';
+                langSignal.value = nextLang;
+            }
+        });
+    });
+
+    observer.observe(htmlElement, { attributes: true, attributeFilter: ['lang'] });
+}
 
 export const setRootState = (rootState: PreffXRootParams = {}) => {
     state.root = {
@@ -305,8 +336,8 @@ export function component({
     const onMount = (fn: () => void | Promise<void>) => callbacks.mount.add(fn);
     const onDestroy = (fn: () => void | Promise<void>) => callbacks.destroy.add(fn);
 
-    const signal = (arg: any) => {
-        const rawSignal = preactSignal(arg) as SignalWithPrev;
+    const signal = <T>(arg: T, options?: SignalOptions<T>): Signal<T> => {
+        const rawSignal = preactSignal(arg, options) as SignalWithPrev;
 
         const dispose = preactEffect(() => {
             const value = rawSignal.value;
@@ -321,7 +352,7 @@ export function component({
 
         return rawSignal;
     };
-    const computed = (fn: () => any) => {
+    const computed = <T>(fn: () => T, options?: SignalOptions<T>) => {
         const rawSignal = preactComputed(() => {
             const prevCtx = {...parentState.context};
             parentState.context = context;
@@ -332,8 +363,8 @@ export function component({
                 result = e;
             }
             parentState.context = prevCtx;
-            return result;
-        })  as SignalWithPrev;;
+            return result as T;
+        }, options)  as SignalWithPrev;
 
         const dispose = preactEffect(() => {
             const value = rawSignal.value;
@@ -348,15 +379,57 @@ export function component({
         return rawSignal;
     };
 
+    /**
+     * useState emulation
+     * @param initial - initial value
+     * @returns [signal, set] – state signal and setState function
+     */
+    const useState = <T>(
+        initial: T | (() => T)
+    ): [Signal<T>, (value: T | ((prev: T) => T)) => void] => {
+        const s = signal(initial)
+        const c = computed(() => s.value);
+
+        const set = (value: T | ((prev: T) => T)) => {
+            s.value = typeof value === 'function' ? (value as (prev: T) => T)(s.value as T) : value;
+        };
+
+        return [c, set];
+    };
+
+    /**
+     * useReducer emulation
+     * @param fn - reducer function
+     * @returns [state, dispatch] – state signal and dispatch function
+     */
+    const useReducer = <S, A>(
+        fn: (state: S, action: A) => S,
+        init: S | (() => S)
+    ): [Signal<S>, (action: A) => void] => {
+        const s = signal<S>(typeof init === 'function' ? (init as () => S)() : init);
+        const c = computed(() => s.value);
+        const dispatch = (action: A) => {
+            batch(() => {
+                s.value = fn(s.value, action);
+            });
+        };
+
+        return [c, dispatch];
+    };
+
     const utils = {
-        signal,
-        computed,
-        context,
-        id,
-        effect: preactEffect,
+        signal, computed, effect: preactEffect,
         untracked, batch, createModel, action,
+        // emulations
+        state: useState, reducer: useReducer,
+        // context
+        context,
+        // unique identifiers
+        id,
         // routing
         url: readonlyUrl,
+        // intl
+        lang: readonlyLang, setLang,
         // lifecycle
         onMount, onDestroy,
         // special components
