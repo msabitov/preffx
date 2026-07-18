@@ -67,6 +67,10 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
      */
     url: ReadonlySignal<URL>;
     /**
+     * Navigate to a specific URL
+     */
+    navigate: Navigation['navigate'];
+    /**
      * Language signal — tracks <html lang="..."> attribute
      */
     lang: ReadonlySignal<string>;

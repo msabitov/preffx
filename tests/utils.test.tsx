@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from 'vitest';
-import { h, Fragment, createRoot, PC } from '../src/index';
+import { h, createRoot, PC } from '../src/index';
 
 function tick(ms: number = 0): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -11,6 +11,55 @@ type CounterAction =
     | { type: 'add'; payload: number };
 
 describe('Component utils', () => {
+    describe('id', () => {
+        let rootElement: HTMLDivElement;
+        let anotherRootElement: HTMLDivElement;
+
+        beforeAll(() => {
+            rootElement = globalThis.document.createElement('div');
+            rootElement.id = 'id-app';
+            globalThis.document.body.appendChild(rootElement);
+
+            anotherRootElement = globalThis.document.createElement('div');
+            anotherRootElement.id = 'another-id-app';
+            globalThis.document.body.appendChild(anotherRootElement);
+
+            return () => {
+                rootElement.remove();
+                anotherRootElement.remove();
+            };
+        });
+
+        const Component: PC<{id: string;}> = ({}, { signal, id }) => {
+            return h('div', {
+                id: id(),
+                children: [h('span', {id: id()})] 
+            });
+        };
+
+        test('each call returns new ID', async () => {
+            const root = createRoot(rootElement);
+            root.mount(Component, {});
+            await tick();
+
+            expect(rootElement.innerHTML).toBe('<div id="fx1_1-0"><span id="fx1_1-1"></span></div>');
+
+            root.destroy();
+        });
+
+        test('each root has its own IDs', async () => {
+            const root = createRoot(rootElement);
+            root.mount(Component, {});
+
+            const anotherRoot = createRoot(anotherRootElement);
+            anotherRoot.mount(Component, {});
+            await tick();
+
+            expect(rootElement.outerHTML).not.toBe(anotherRootElement.outerHTML);
+
+            root.destroy();
+        });
+    });
 
     describe('state', () => {
         let rootElement: HTMLDivElement;

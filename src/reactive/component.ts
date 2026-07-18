@@ -54,7 +54,8 @@ const urlSignal = preactSignal(new URL(globalThis.location.href), {
     }
 });
 const readonlyUrl = preactComputed(() => urlSignal.value);
-globalThis.navigation?.addEventListener('navigate', (event) => {
+const globalNavigation = globalThis.navigation;
+globalNavigation?.addEventListener('navigate', (event) => {
     const nextUrl = new URL(event.destination.url);
     const currentUrl = readonlyUrl.peek();
     // if the navigation is cross-origin
@@ -66,6 +67,10 @@ globalThis.navigation?.addEventListener('navigate', (event) => {
         urlSignal.value = nextUrl;
     }
 });
+
+const navigate: Navigation['navigate'] = (url, options) => {
+    return globalNavigation?.navigate(url, options);
+};
 
 // lang
 const htmlElement = globalThis.document?.documentElement;
@@ -314,7 +319,7 @@ export function component({
 }) {
     // prepare ctx
     const parentState = state.root;
-    const parentCtx = {...parentState.context};
+    const parentCtx = parentState.context;
     const context = {...parentCtx};
     parentState.context = context;
     // counters
@@ -427,7 +432,7 @@ export function component({
         // unique identifiers
         id,
         // routing
-        url: readonlyUrl,
+        url: readonlyUrl, navigate,
         // intl
         lang: readonlyLang, setLang,
         // lifecycle

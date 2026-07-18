@@ -39,7 +39,13 @@ PreffX is a self-confident JS library for creating reactive DOM. It is inspired 
 
 ## Installation
 
-You can use [degit](https://github.com/Rich-Harris/degit):
+The recommended way is to use the `create-preffx` interactive utility, which allows you to define name, language, and CSS solution for the project:
+
+```bash
+npx create-preffx
+```
+
+Alternatively you can use [degit](https://github.com/Rich-Harris/degit):
 
 ```bash
 npx degit msabitov/vite-preffx preffx-starter 
@@ -78,10 +84,16 @@ export const App: PC = (props, { signal }) => {
     const signalRef = signal();
     return <div $ref={signalRef}>
         <div
-          $ref={(refVal) => {
-            // it will be called after element mounted with refVal = HTMLDivElement
-            // and before element destroyed with refVal = null
-          }}
+            $ref={(refVal) => {
+                // it will be called after element mounted with refVal = HTMLDivElement
+                // and before element destroyed with refVal = null
+            }}
+            $onMount={(refVal) => {
+                // it will be called after element mounted with refVal = HTMLDivElement
+            }}
+            $onDestroy={() => {
+                // it will be called before element destroyed with refVal = HTMLDivElement
+            }}
         >
             Refs
         </button>
