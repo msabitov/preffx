@@ -1,5 +1,5 @@
 import { batch, createModel, effect, signal } from '@preact/signals-core';
-import { destroy, mount, isPromise, isSignal, resolveDeepValue, isArray } from '../utils';
+import { destroy, mount, isPromise, isSignal, resolveDeepValue, isArray } from '../utils/core';
 import type { SignalWithPrev } from '../types';
 
 // only signal can be a reason to recomputation

@@ -71,6 +71,14 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
      */
     navigate: Navigation['navigate'];
     /**
+     * Route params
+     */
+    routeParams: Record<string, string>;
+    /**
+     * Routing utility - first-match-wins
+     */
+    routes: (paths: Record<string, PC | APC>) => ReadonlySignal<any>;
+    /**
      * Language signal — tracks <html lang="..."> attribute
      */
     lang: ReadonlySignal<string>;

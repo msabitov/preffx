@@ -7,20 +7,31 @@ import {
     untracked,
     Signal,
     action,
-    SignalOptions
+    SignalOptions,
+    ReadonlySignal
 } from '@preact/signals-core';
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
-    isPromise, resolveDeepValue, resolveDeepRawValue, resolveValue, TPreffXItem,
-} from '../utils';
+    isPromise, resolveDeepRawValue, resolveValue, TPreffXItem,
+} from '../utils/core';
+import { matchPath } from '../utils/routing';
 import { childrenEffects } from './children';
-import { PC, PreffXRootParams, SignalWithPrev } from '../types';
+import { PC, APC, PreffXRootParams, SignalWithPrev } from '../types';
 
 type StateWithComponentIndex = PreffXRootParams & {index: number;};
+type RoutesPaths = Record<string, PC<any> | APC<any>>;
 
+/**
+ * Path pattern symbol
+ */
+const pathSymbol = Symbol('preffx-path');
+const routeParamsSymbol = Symbol('preffx-route-params');
 const defaultRootState: StateWithComponentIndex = {
     // component context
-    context: {},
+    context: {
+        [pathSymbol]: preactSignal('/'),
+        [routeParamsSymbol]: {}
+    },
     // component index
     index: 0
 };
@@ -253,7 +264,7 @@ const Portal: PC<{
         });
     }
     return null;
-}
+};
 
 // reactive component
 const ComponentModel = createModel<any, any>(({
@@ -319,9 +330,14 @@ export function component({
 }) {
     // prepare ctx
     const parentState = state.root;
-    const parentCtx = parentState.context;
+    const parentCtx = parentState.context as Record<string | symbol, any>;
     const context = {...parentCtx};
+    if (props[pathSymbol]) context[pathSymbol] = props[pathSymbol];
+    const basePath = context[pathSymbol];
+    if (props[routeParamsSymbol]) context[routeParamsSymbol] = props[routeParamsSymbol];
+    const routeParams = context[routeParamsSymbol];
     parentState.context = context;
+
     // counters
     let componentPrefix = parentState.prefix + (++parentState.index).toString(RADIX) + '-';
     const counters = {
@@ -421,6 +437,36 @@ export function component({
 
         return [c, dispatch];
     };
+    const routes = (paths: RoutesPaths) => {
+        const matchResult = computed(() => {
+            const fullPathname = readonlyUrl.value.pathname;
+
+            for (const pattern of Object.keys(paths)) {
+                const effectivePattern = pattern.startsWith('/')
+                    ? pattern
+                    : `${basePath}/${pattern}`.replace(/\/+/g, '/');
+
+                const result = matchPath(effectivePattern, fullPathname);
+                if (result) return {result, pattern, effectivePattern};
+            }
+            return null;
+        });
+
+        return computed(() => {
+            const paramsValue = matchResult.value;
+            if (paramsValue) {
+                const {result, pattern, effectivePattern} = paramsValue;
+                return component({
+                    type: paths[pattern],
+                    props: {
+                        [pathSymbol]: effectivePattern,
+                        [routeParamsSymbol]: result.params
+                    }
+                });
+            }
+            return null;
+        });
+    };
 
     const utils = {
         signal, computed, effect: preactEffect,
@@ -432,7 +478,7 @@ export function component({
         // unique identifiers
         id,
         // routing
-        url: readonlyUrl, navigate,
+        url: readonlyUrl, navigate, routes, routeParams,
         // intl
         lang: readonlyLang, setLang,
         // lifecycle

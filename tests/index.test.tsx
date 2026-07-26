@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { h, Fragment, createRoot, PC } from '../src/index';
 
 function tick(ms: number = 0): Promise<void> {
@@ -171,6 +171,67 @@ const RouterComponent: PC = (_, {
     ]});
 };
 
+const AppWithRoutes: PC = (_, { routes }) => {
+    return h('div',{
+        children: [
+            h('a', {
+                href: '/',
+                children: 'Home'
+            }),
+            h('a', {
+                href: '/about',
+                children: 'About'
+            }),
+            h('a', {
+                href: '/unknown',
+                children: 'Unknown'
+            }),
+            routes({
+                '/': () => h('span', { children: ['Home page'] }),
+                'about': () => h('span', { children: ['About me'] }),
+                '*': () => h('span', { children: ['Not found'] }),
+            })
+        ]
+    });
+};
+
+const AppWithRoutesParams: PC = (_, { routes }) => {
+    return h('div',{
+        children: [
+            h('a', {
+                href: '/user/42',
+                children: 'Open user page'
+            }),
+            routes({
+                '/user/:id': (_, {routeParams}) =>
+                    h('span', { id: 'r', children: [`User ${routeParams.id}`] })
+            })
+        ]
+    });
+};
+
+const AppWithNestedRoutes: PC = (_, { routes }) => {
+    return h('div',{
+        children: [
+            h('a', {
+                href: '/chat/user/42',
+                children: 'Open user page'
+            }),
+            h('a', {
+                href: '/chat/settings?query=privacy',
+                children: 'Open chat settings'
+            }),
+            routes({
+                '/chat': (_, {routes: nestedRoutes}) => nestedRoutes({
+                    'user/:id': (_, {routeParams}) => h('span', { children: [`User ${routeParams.id}`] }),
+                    'settings': (_, {url}) => h('span', { children: [`Settings (${url.value.searchParams.get('query')})`] }),
+                }),
+                '*': () => h('span', { children: [`Fallback route`] })
+            })
+        ]
+    });
+};
+
 describe('PreffX root', () => {
     let rootElement: HTMLDivElement;
     let anotherRootElement: HTMLDivElement;
@@ -329,7 +390,7 @@ describe('Reactivity', () => {
         root.destroy();
     });
 
-    test('routing', async () => {
+    test('url', async () => {
         const root = createRoot(rootElement);
         root.mount(
             RouterComponent, {}
@@ -344,6 +405,58 @@ describe('Reactivity', () => {
         (rootElement.querySelector('a[href="/contacts"]') as HTMLAnchorElement).click();
         expect(rootElement.innerHTML).toContain('<div>Contacts page content</div>');
     });
+
+    describe('routes', () => {
+        beforeEach(() => {
+            window.location.pathname = '';
+        });
+
+        test('path changes', async () => {
+            const root = createRoot(rootElement);
+            root.mount(AppWithRoutes, {});
+
+            await tick();
+            expect(rootElement.innerHTML).toContain('<span>Home page</span>');
+
+            (rootElement.querySelector('a[href="/about"]') as HTMLAnchorElement).click();
+            await tick();
+            expect(rootElement.innerHTML).toContain('<span>About me</span>');
+
+            (rootElement.querySelector('a[href="/unknown"]') as HTMLAnchorElement).click();
+            await tick();
+            expect(rootElement.innerHTML).toContain('<span>Not found</span>');
+            root.destroy();
+            await tick();
+        });
+
+        test('handlers receive params', async () => {
+            const root = createRoot(rootElement);
+            root.mount(AppWithRoutesParams, {});
+            await tick();
+            (rootElement.querySelector('a[href="/user/42"]') as HTMLAnchorElement).click();
+            expect(rootElement.textContent).toContain('User 42');
+            root.destroy();
+            await tick();
+        });
+
+        test('nested routes', async () => {
+            const root = createRoot(rootElement);
+            root.mount(AppWithNestedRoutes, {});
+
+            await tick();
+            expect(rootElement.innerHTML).toContain('<span>Fallback route</span>');
+
+            (rootElement.querySelector('a[href="/chat/user/42"]') as HTMLAnchorElement).click();
+            await tick();
+            expect(rootElement.innerHTML).toContain('<span>User 42</span>');
+
+            (rootElement.querySelector('a[href="/chat/settings?query=privacy"]') as HTMLAnchorElement).click();
+            await tick();
+            expect(rootElement.innerHTML).toContain('<span>Settings (privacy)</span>');
+            root.destroy();
+            await tick();
+        });
+    });
 });
 
 describe('Special components', () => {
@@ -353,6 +466,7 @@ describe('Special components', () => {
         rootElement = globalThis.document.createElement('div');
         rootElement.id = 'app';
         globalThis.document.body.appendChild(rootElement);
+        return () => { rootElement.remove(); };
     });
 
     describe('Fragment', () => {

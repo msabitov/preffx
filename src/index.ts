@@ -2,7 +2,7 @@ import type { PC, APC, PreffXRootParams } from './types';
 import { node } from './reactive/node';
 import { component, setRootState, Fragment } from './reactive/component';
 import { childrenEffects } from './reactive/children';
-import { destroy, isArray, mount } from './utils';
+import { destroy, isArray, mount } from './utils/core';
 
 export type { PC, APC };
 

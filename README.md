@@ -18,7 +18,7 @@
 
 PreffX is a self-confident JS library for creating reactive DOM. It is inspired by React and Preact, but offers its own signal-based approach.
 
-⚠️ The project is currently in an experimental stage, do not use in a production environment. ⚠️
+⚠️ The project is in an experimental stage, do not use in a production environment ⚠️
 
 ## Basic principles
 
@@ -286,6 +286,30 @@ export const App: PC = (props, { computed, url }) => {
         <a href='/home'>Home</a>
         <a href='/contacts'>Contacts</a>
         {routeContent}
+    </div>;
+};
+```
+
+- Advanced routing:
+
+```tsx
+import type { PC } from 'preffx';
+
+export const App: PC = (props, { routes }) => {
+    const routesContent = routes({
+        // root
+        '/': () => <div>Home page content</div>,
+        // route params
+        '/:lang?/user/:id': (_, {routeParams}) => <div>User #{routeParams.id} ({routeParams.lang || 'en'})</div>,
+        // fallback
+        '*': () => <div>Not found</div>
+    });
+    return <div>
+        <a href='/'>Home</a>
+        <a href='/user/42'>User page</a>
+        <a href='/ru/user/42'>User page (ru)</a>
+        <a href='/inknown'>Unknown page</a>
+        {routesContent}
     </div>;
 };
 ```
