@@ -314,7 +314,7 @@ export const App: PC = (props, { routes }) => {
 };
 ```
 
-- i18n example:
+- Simple i18n example:
 
 ```tsx
 import type { PC } from 'preffx';
@@ -338,6 +338,50 @@ export const App: PC = (props, { computed, lang }) => {
     return <div>
         <button>{captions.openProfile}</button>
         <button>{captions.showStats}</button>
+    </div>;
+};
+```
+
+- Advanced i18n example:
+
+```tsx
+import type { APC } from 'preffx';
+
+const getRuDictionary = async () => {
+    // there can be dynamic imports
+    return {
+        openProfile(name: string) {
+            return 'Открыть профиль № ' + name;
+        },
+        showStats: 'Показать статистику'
+    };
+};
+
+const getEnDictionary = async () => {
+    // there can be dynamic imports
+    return {
+        openProfile(name: string) {
+            return 'Open profile № ' + name;
+        },
+        showStats: 'Show stats'
+    };
+};
+
+export const App: APC = async (props, { dict, setLang }) => {
+    const initialDict = await getEnDictionary();
+    // locales need to be passed with dictionary resolvers,
+    // resolvers can be async
+    const captions = dict({
+        ru: getRuDictionary,
+        en: getEnDictionary
+    }, initialDict);
+    return <div>
+        <button onClick={() => setLang('en')}>EN</button>
+        <button onClick={() => setLang('ru')}>RU</button>
+        <span>
+            <button>{captions.openProfile('42')}</button>
+            <button>{captions.showStats}</button>
+        </span>    
     </div>;
 };
 ```

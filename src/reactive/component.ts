@@ -13,10 +13,11 @@ import {
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
     isPromise, resolveDeepRawValue, resolveValue, TPreffXItem,
+    SIGNAL_MARKER,
 } from '../utils/core';
 import { matchPath } from '../utils/routing';
 import { childrenEffects } from './children';
-import { PC, APC, PreffXRootParams, SignalWithPrev } from '../types';
+import { PC, APC, PreffXRootParams, SignalWithPrev, DictProxy } from '../types';
 
 type StateWithComponentIndex = PreffXRootParams & {index: number;};
 type RoutesPaths = Record<string, PC<any> | APC<any>>;
@@ -26,7 +27,7 @@ type RoutesPaths = Record<string, PC<any> | APC<any>>;
  */
 const pathSymbol = Symbol('preffx-path');
 const routeParamsSymbol = Symbol('preffx-route-params');
-const defaultRootState: StateWithComponentIndex = {
+const defaultRootState: Omit<StateWithComponentIndex, 'utils'> = {
     // component context
     context: {
         [pathSymbol]: preactSignal('/'),
@@ -48,12 +49,11 @@ const state: {
     root: StateWithComponentIndex;
 } = {
     count: 0,
-    root: {index: 0}
+    root: {index: 0} as unknown as StateWithComponentIndex
 };
 
 const RADIX = 36;
 let URL_WATCHERS = 0;
-let LANG_WATCHERS = 0;
 
 // url
 const urlSignal = preactSignal(new URL(globalThis.location.href), {
@@ -83,44 +83,20 @@ const navigate: Navigation['navigate'] = (url, options) => {
     return globalNavigation?.navigate(url, options);
 };
 
-// lang
-const htmlElement = globalThis.document?.documentElement;
-const langSignal = preactSignal(htmlElement?.getAttribute('lang') || '', {
-    watched: () => {
-        LANG_WATCHERS++;
-    },
-    unwatched: () => {
-        LANG_WATCHERS--;
-    }
-});
-
-const readonlyLang = preactComputed(() => langSignal.value);
-const setLang = (value: string) => {
-    htmlElement?.setAttribute('lang', value);
-};
-if (htmlElement) {
-    const observer = new MutationObserver((mutations) => {
-        if (!LANG_WATCHERS) return;
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'lang') {
-                const nextLang = htmlElement.getAttribute('lang') || '';
-                langSignal.value = nextLang;
-            }
-        });
-    });
-
-    observer.observe(htmlElement, { attributes: true, attributeFilter: ['lang'] });
-}
-
-export const setRootState = (rootState: PreffXRootParams = {}) => {
+export const setRootState = (rootState: PreffXRootParams) => {
+    const {context = {}, ...rest} = rootState;
     state.root = {
         ...defaultRootState,
-        ...rootState,
+        context: {
+            ...defaultRootState.context,
+            ...context
+        },
+        ...rest,
         index: 0
     };
     state.count++;
     if (!state.root.prefix) state.root.prefix = 'fx' + state.count + '_';
-}
+};
 
 // utils
 const isError = (val: any) => val instanceof Error;
@@ -330,6 +306,7 @@ export function component({
 }) {
     // prepare ctx
     const parentState = state.root;
+    const parentUtils = state.root.utils;
     const parentCtx = parentState.context as Record<string | symbol, any>;
     const context = {...parentCtx};
     if (props[pathSymbol]) context[pathSymbol] = props[pathSymbol];
@@ -468,6 +445,67 @@ export function component({
         });
     };
 
+    // Extract per-root lang signal from context
+    const readonlyLang = parentUtils.lang;
+    const setLang = parentUtils.setLang;
+
+    const dictDisposers: Function[] = [];
+
+    const dict = <T extends object>(
+        resolvers: Record<string, () => (T | Promise<T>)>,
+        initial?: T
+    ): DictProxy<T> => {
+        const dictSignal = preactSignal(initial ?? ({} as T));
+        const dispose = preactEffect(() => {
+            const langValue = readonlyLang.value;
+            const resolver = resolvers[langValue] || resolvers['*'];
+            if (!resolver) {
+                dictSignal.value = {} as T;
+                return;
+            }
+            const result = resolver();
+            if (!isPromise(result)) {
+                dictSignal.value = result as T;
+                return;
+            }
+            let cancelled = false;
+            (result as Promise<T>).then(dict => {
+                if (!cancelled) dictSignal.value = dict;
+            }).catch(() => {
+                if (!cancelled) dictSignal.value = {} as T;
+            });
+            return () => { cancelled = true; };
+        });
+        dictDisposers.push(dispose);
+
+        // Per-field computed cache (for non-function access)
+        const fieldCache = new Map<string, ReadonlySignal<any>>();
+        return new Proxy({} as DictProxy<T>, {
+            get(_, key) {
+                if (typeof key !== 'string') return Reflect.get(_, key);
+                // Create a callable wrapper: when invoked with args,
+                // creates a computed that calls the dictionary function field.
+                const wrapper = (...args: any[]) =>
+                    preactComputed(() => (dictSignal.value as any)[key](...args));
+                // .value getter — creates cached computed for non-function access
+                Object.defineProperty(wrapper, 'value', {
+                    get: () => {
+                        if (!fieldCache.has(key)) {
+                            fieldCache.set(key, preactComputed(() => (dictSignal.value as any)[key]));
+                        }
+                        return fieldCache.get(key)!.value;
+                    },
+                    enumerable: true,
+                });
+                // .peek() — returns current field value without tracking
+                wrapper.peek = () => (dictSignal.peek() as any)[key];
+                // Signal marker so isSignal() recognizes this as a signal
+                wrapper[SIGNAL_MARKER] = true;
+                return wrapper;
+            },
+        });
+    };
+
     const utils = {
         signal, computed, effect: preactEffect,
         untracked, batch, createModel, action,
@@ -480,7 +518,7 @@ export function component({
         // routing
         url: readonlyUrl, navigate, routes, routeParams,
         // intl
-        lang: readonlyLang, setLang,
+        lang: readonlyLang, setLang, dict,
         // lifecycle
         onMount, onDestroy,
         // special components
@@ -495,6 +533,7 @@ export function component({
     });
     onDestroyCallback(componentRoot, () => {
         callbacks.destroy.forEach((fn) => fn());
+        dictDisposers.forEach((fn) => fn());
         componentModel[Symbol.dispose]();
     });
 

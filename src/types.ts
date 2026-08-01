@@ -15,9 +15,33 @@ export type PreffXRootParams = {
      * Root component context
      */
     context?: Record<string, any>;
+    /**
+     * Default language for i18n (e.g. 'en', 'ru')
+     * If not provided, falls back to <html lang> attribute or ''
+     */
+    defaultLang?: string;
+    /**
+     * Root specific utils
+     */
+    utils: {
+        lang: ReadonlySignal<string>;
+        setLang: (value: string | null) => void;
+    };
 };
 
 export type SignalWithPrev<T = any> = Signal<T> & {prev: T | undefined};
+
+/**
+ * DictProxy — proxy over a resolved dictionary object.
+ * Each key becomes a callable property that returns a ReadonlySignal.
+ * - For scalar fields: `proxy.title` → `ReadonlySignal<string>` (computed)
+ * - For function fields: `proxy.greet('John')` → `ReadonlySignal<string>` (also computed)
+ */
+export type DictProxy<T extends object> = {
+    [K in keyof T]: T[K] extends (...args: infer P) => infer R
+        ? (...args: P) => ReadonlySignal<R>
+        : ReadonlySignal<T[K]>;
+};
 
 type PreffXContext = Record<string | symbol, any>;
 
@@ -87,6 +111,12 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
      * @param value - language code (e.g. 'en', 'ru')
      */
     setLang: (value: string) => void;
+    /**
+     * Dictionary — returns a DictProxy where each field is a callable signal
+     * @param resolvers
+     * @param initial
+     */
+    dict: <T extends object>(resolvers: Record<string, () => (T | Promise<T>)>, initial?: T) => DictProxy<T>;
     /**
      * useState-like hook
      * @param initial — initial value or factory function

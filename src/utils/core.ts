@@ -7,9 +7,10 @@ export type TPreffXItem = {
 // symbols
 const mountSymbol = Symbol('PreffX.mount');
 const destroySymbol = Symbol('PreffX.destroy');
+export const SIGNAL_MARKER = Symbol('preffx-signal-marker');
 // base utils
 export const isArray = (val: any) => Array.isArray(val);
-export const isSignal = (val: any) => val instanceof Signal;
+export const isSignal = (val: any) => val instanceof Signal || val?.[SIGNAL_MARKER];
 export const isNode = (val: any) => val instanceof Node;
 export const isPromise = (fn: any) => fn && fn.then && typeof fn.then === 'function' && fn.catch && typeof fn.catch === 'function';
 export const resolveValue = (arg: any): any => isSignal(arg) ? arg.value : arg;
