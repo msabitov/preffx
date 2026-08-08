@@ -6,6 +6,22 @@ import {
 } from "@preact/signals-core";
 import * as CSS from "csstype";
 
+/**
+ * Root specific utils for i18n
+ */
+export type IntlRootUtils = {
+    lang: ReadonlySignal<string>;
+    setLang: (value: string | null) => void;
+};
+
+/**
+ * Root specific utils for routing
+ */
+export type RoutingRootUtils = {
+    url: ReadonlySignal<URL>;
+    navigate: Navigation['navigate'];
+};
+
 export type PreffXRootParams = {
     /**
      * Prefix for unique ids
@@ -21,12 +37,13 @@ export type PreffXRootParams = {
      */
     defaultLang?: string;
     /**
+     * Default URL for root
+     */
+    defaultURL?: URL;
+    /**
      * Root specific utils
      */
-    utils: {
-        lang: ReadonlySignal<string>;
-        setLang: (value: string | null) => void;
-    };
+    utils: IntlRootUtils & RoutingRootUtils;
 };
 
 export type SignalWithPrev<T = any> = Signal<T> & {prev: T | undefined};

@@ -144,7 +144,8 @@ const DeferComponent: PC<{
 
 const RouterComponent: PC = (_, {
     computed,
-    url
+    url,
+    navigate
 }) => {
     const routeContent = computed(() => {
         switch(url.value.pathname) {
@@ -166,6 +167,10 @@ const RouterComponent: PC = (_, {
             h('a', {
                 href: '/contacts',
                 children: ['Contacts']
+            }),
+            h('button', {
+                onClick: () => navigate(new URL('/contacts', window.location.origin)),
+                children: ['Go to contacts']
             }),
             routeContent
     ]});
@@ -403,6 +408,20 @@ describe('Reactivity', () => {
         expect(rootElement.innerHTML).toContain('<div>Home page content</div>');
 
         (rootElement.querySelector('a[href="/contacts"]') as HTMLAnchorElement).click();
+        expect(rootElement.innerHTML).toContain('<div>Contacts page content</div>');
+    });
+
+    test('defaultURL sets the initial route without Navigation API', async () => {
+        const root = createRoot(rootElement, { defaultURL: new URL('/home', window.location.origin) });
+        root.mount(RouterComponent, {});
+        await tick();
+
+        // detached routing
+        expect(rootElement.innerHTML).toContain('<div>Home page content</div>');
+
+        // detached navigate() updates the signal directly
+        (rootElement.querySelector('button') as HTMLButtonElement).click();
+        await tick();
         expect(rootElement.innerHTML).toContain('<div>Contacts page content</div>');
     });
 

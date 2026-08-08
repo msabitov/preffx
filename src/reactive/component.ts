@@ -53,35 +53,6 @@ const state: {
 };
 
 const RADIX = 36;
-let URL_WATCHERS = 0;
-
-// url
-const urlSignal = preactSignal(new URL(globalThis.location.href), {
-    watched: () => {
-        URL_WATCHERS++;
-    },
-    unwatched: () => {
-        URL_WATCHERS--;
-    }
-});
-const readonlyUrl = preactComputed(() => urlSignal.value);
-const globalNavigation = globalThis.navigation;
-globalNavigation?.addEventListener('navigate', (event) => {
-    const nextUrl = new URL(event.destination.url);
-    const currentUrl = readonlyUrl.peek();
-    // if the navigation is cross-origin
-    const isCrossDomain = nextUrl.origin !== currentUrl.origin;
-    if (isCrossDomain) return;
-    else if (URL_WATCHERS) {
-        // custom handling
-        event.preventDefault();
-        urlSignal.value = nextUrl;
-    }
-});
-
-const navigate: Navigation['navigate'] = (url, options) => {
-    return globalNavigation?.navigate(url, options);
-};
 
 export const setRootState = (rootState: PreffXRootParams) => {
     const {context = {}, ...rest} = rootState;
@@ -448,6 +419,8 @@ export function component({
     // Extract per-root lang signal from context
     const readonlyLang = parentUtils.lang;
     const setLang = parentUtils.setLang;
+    const readonlyUrl = parentUtils.url;
+    const navigate = parentUtils.navigate;
 
     const dictDisposers: Function[] = [];
 

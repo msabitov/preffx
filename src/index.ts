@@ -74,6 +74,48 @@ export function createRoot(node: ParentNode, params?: Omit<PreffXRootParams, 'ut
         langObserver.observe(htmlElement, { attributes: true, attributeFilter: ['lang'] });
     }
 
+    // root URL signal
+    // Detached routing (signal-managed navigation) is implied when a custom `defaultURL` is provided 
+    // or when the browser Navigation API is unavailable (SSR / headless environment)
+    const useDetachedRouting = !!params?.defaultURL || !globalThis.navigation;
+    const rawUrl = params?.defaultURL || globalThis.location.href;
+    let URL_WATCHERS = 0;
+    const urlSignal = preactSignal(new URL(rawUrl), {
+        watched: () => { URL_WATCHERS++; },
+        unwatched: () => { URL_WATCHERS--; }
+    });
+    const readonlyUrl = preactComputed(() => urlSignal.value);
+
+    // navigation listener
+    const globalNavigation = useDetachedRouting ? undefined : globalThis.navigation;
+    globalNavigation?.addEventListener('navigate', (event) => {
+        const nextUrl = new URL(event.destination.url);
+        const currentUrl = readonlyUrl.peek();
+        // if the navigation is cross-origin
+        const isCrossDomain = nextUrl.origin !== currentUrl.origin;
+        if (isCrossDomain) return;
+        else if (URL_WATCHERS) {
+            // custom handling
+            event.preventDefault();
+            urlSignal.value = nextUrl;
+        }
+    });
+
+    const resolveUrl = (url: string | URL) => {
+        // resolve relative paths against the current URL so the signal always holds a URL
+        return url instanceof URL
+            ? url
+            : new URL(url, urlSignal.peek().href);
+    };
+
+    const navigate = (url: string | URL, options?: any) => {
+        if (useDetachedRouting) {
+            urlSignal.value = resolveUrl(url);
+            return;
+        }
+        return globalNavigation?.navigate(url, options);
+    };
+
     return {
         /**
          * Mount JSX
@@ -83,7 +125,8 @@ export function createRoot(node: ParentNode, params?: Omit<PreffXRootParams, 'ut
             setRootState({
                 ...(params || {}),
                 utils: {
-                    lang: readonlyLang, setLang
+                    lang: readonlyLang, setLang,
+                    url: readonlyUrl, navigate: navigate as unknown as Navigation['navigate']
                 }
             });
             children = h(type, props);
