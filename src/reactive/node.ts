@@ -1,6 +1,7 @@
 import { createModel, effect, Signal } from '@preact/signals-core';
 import { mount, destroy, onMountCallback, onDestroyCallback, isSignal, resolveValue, TPreffXItem } from '../utils/core';
 import { childrenEffects } from './children';
+import { Renderer } from '../utils/render';
 
 // utils
 const resolveRef = (ref: Signal | ((node: Node | null) => void), value: Node | null = null) => {
@@ -13,118 +14,6 @@ const kebabCase = (str: string): string => str.replace(/[A-Z]/g, (v) => '-' + v.
 const propVal = (prop: string, val: any) => `${kebabCase(prop)}:${'' + val};`
 const stringify = (obj: object): string => Object.entries(obj).reduce((acc, item) => acc + (item[1] ? propVal(item[0], item[1]) : ''), '');
 const isDefined = (arg: any) => arg !== null && arg !== undefined;
-
-// DOM
-const HTML = 'html';
-const SVG = 'svg';
-const MATHML = 'mathml';
-
-const NS = {
-    [HTML]: 'http://www.w3.org/1999/xhtml',
-    [SVG]: 'http://www.w3.org/2000/svg',
-    [MATHML]: 'http://www.w3.org/1998/Math/MathML'
-} as const;
-
-// mapping between tagname and namespace
-const TAG_NS: Record<string, keyof typeof NS> = {
-    // a - html/svg,
-    // image - html/svg,
-    // style, script - html/svg
-    animate: SVG,
-    animateMotion: SVG,
-    animateTransform: SVG,
-    circle: SVG,
-    clipPath: SVG,
-    defs: SVG,
-    desc: SVG,
-    ellipse: SVG,
-    feBlend: SVG,
-    feColorMatrix: SVG,
-    feComponentTransfer: SVG,
-    feComposite: SVG,
-    feConvolveMatrix: SVG,
-    feDiffuseLighting: SVG,
-    feDisplacementMap: SVG,
-    feDistantLight: SVG,
-    feDropShadow: SVG,
-    feFlood: SVG,
-    feFuncA: SVG,
-    feFuncB: SVG,
-    feFuncG: SVG,
-    feFuncR: SVG,
-    feGaussianBlur: SVG,
-    feImage: SVG,
-    feMerge: SVG,
-    feMergeNode: SVG,
-    feMorphology: SVG,
-    feOffset: SVG,
-    fePointLight: SVG,
-    feSpecularLighting: SVG,
-    feSpotLight: SVG,
-    feTile: SVG,
-    feTurbulence: SVG,
-    filter: SVG,
-    foreignObject: SVG,
-    g: SVG,
-    line: SVG,
-    linearGradient: SVG,
-    marker: SVG,
-    mask: SVG,
-    metadata: SVG,
-    mpath: SVG,
-    path: SVG,
-    pattern: SVG,
-    polygon: SVG,
-    polyline: SVG,
-    radialGradient: SVG,
-    rect: SVG,
-    set: SVG,
-    stop: SVG,
-    svg: SVG,
-    switch: SVG,
-    symbol: SVG,
-    text: SVG,
-    textPath: SVG,
-    title: SVG,
-    tspan: SVG,
-    use: SVG,
-    view: SVG,
-    // mathml
-    math: MATHML,
-    annotation: MATHML,
-    'annotation-xml': MATHML,
-    merror: MATHML,
-    mfrac: MATHML,
-    mi: MATHML,
-    mmultiscripts: MATHML,
-    mn: MATHML,
-    mo: MATHML,
-    mover: MATHML,
-    mpadded: MATHML,
-    mphantom: MATHML,
-    mprescripts: MATHML,
-    mroot: MATHML,
-    mrow: MATHML,
-    ms: MATHML,
-    semantics: MATHML,
-    mspace: MATHML,
-    msqrt: MATHML,
-    mstyle: MATHML,
-    msub: MATHML,
-    msup: MATHML,
-    msubsup: MATHML,
-    mtable: MATHML,
-    mtd: MATHML,
-    mtext: MATHML,
-    mtr: MATHML,
-    munder: MATHML,
-    munderover: MATHML
-};
-
-export const createElement = (ns: keyof typeof NS, name: string, options?: object) => {
-    return document.createElementNS(NS[ns || TAG_NS[name] || 'html'], name, options);
-};
-
 
 // node reactive model
 const NodeModel = createModel<any, any>(({
@@ -238,7 +127,7 @@ export const node = ({
         ...clearProps
     } = props;
 
-    const node = createElement($ns, type, props && props.is ? {
+    const node = Renderer.createElement($ns, type, props && props.is ? {
         is: props.is
     } : undefined) as unknown as (Node & TPreffXItem);
 

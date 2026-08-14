@@ -282,14 +282,24 @@ describe('PreffX root', () => {
             AppWithId,
             {}
         );
-        expect(rootElement.firstElementChild?.id).toBe('fx2_1-0');
+        const rootId = rootElement.firstElementChild?.id as string;
+        expect(rootId).toMatch(/^fx\d+_1-0$/); // prefix fixed at root creation
 
         const anotherRoot = createRoot(anotherRootElement);
         anotherRoot.mount(
             AppWithId,
             {}
         );
-        expect(anotherRootElement.firstElementChild?.id).toBe('fx3_1-0');
+        const anotherId = anotherRootElement.firstElementChild?.id as string;
+        expect(anotherId).toMatch(/^fx\d+_1-0$/);
+        // different roots → different prefixes
+        expect(anotherId).not.toBe(rootId);
+
+        // prefix survives destroy → mount (component counters reset, prefix does not)
+        root.destroy();
+        expect(rootElement.firstElementChild).toBe(null);
+        root.mount(AppWithId, {});
+        expect(rootElement.firstElementChild?.id).toBe(rootId);
 
         root.destroy();
         expect(rootElement.firstElementChild).toBe(null);

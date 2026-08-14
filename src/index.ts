@@ -1,9 +1,10 @@
 import type { PC, APC, PreffXRootParams } from './types';
 import { node } from './reactive/node';
-import { component, setRootState, Fragment } from './reactive/component';
+import { component, Fragment } from './reactive/component';
 import { childrenEffects } from './reactive/children';
 import { destroy, isArray, mount } from './utils/core';
 import { signal as preactSignal, computed as preactComputed } from '@preact/signals-core';
+import { withScope, pathSymbol, routeParamsSymbol, createRootScope, RootScope } from './utils/render';
 
 export type { PC, APC };
 
@@ -43,6 +44,8 @@ export function h(
     });
 };
 
+let ROOT_COUNT = 0;
+
 /**
  * Create PreffX root
  */
@@ -75,7 +78,7 @@ export function createRoot(node: ParentNode, params?: Omit<PreffXRootParams, 'ut
     }
 
     // root URL signal
-    // Detached routing (signal-managed navigation) is implied when a custom `defaultURL` is provided 
+    // Detached routing (signal-managed navigation) is implied when a custom `defaultURL` is provided
     // or when the browser Navigation API is unavailable (SSR / headless environment)
     const useDetachedRouting = !!params?.defaultURL || !globalThis.navigation;
     const rawUrl = params?.defaultURL || globalThis.location.href;
@@ -116,24 +119,42 @@ export function createRoot(node: ParentNode, params?: Omit<PreffXRootParams, 'ut
         return globalNavigation?.navigate(url, options);
     };
 
+    const rootUtils = {
+        lang: readonlyLang, setLang,
+        url: readonlyUrl, navigate: navigate as unknown as Navigation['navigate']
+    };
+
+    // the root prefix is fixed at root creation time (even before mount),
+    const prefix = params?.prefix || 'fx' + (++ROOT_COUNT) + '_';
+
+    // root-specific utils (lang, url, navigate) and user-provided context,
+    // shared across every mount of this root
+    const utils = rootUtils;
+    const baseContext: Record<string | symbol, any> = {
+        ...(params?.context || {}),
+        [pathSymbol]: preactSignal('/'),
+        [routeParamsSymbol]: {}
+    };
+
+    // shared per-root context object that gets copied per mount (so a fresh
+    // context is used each mount, while the routing symbols stay consistent)
+    const rootContext: Record<string | symbol, any> = {...baseContext};
+
     return {
         /**
          * Mount JSX
          * @param content - JSX to render
          */
         mount<T extends object>(type: PC<T> | APC<T>, props: object = {}) {
-            setRootState({
-                ...(params || {}),
-                utils: {
-                    lang: readonlyLang, setLang,
-                    url: readonlyUrl, navigate: navigate as unknown as Navigation['navigate']
-                }
+            // fresh scope per mount: counters reset, but the root prefix stays
+            const scope: RootScope = createRootScope(prefix, utils, {...rootContext});
+            withScope(scope, () => {
+                children = h(type, props);
+                clearEffects = childrenEffects({
+                    root, children
+                });
+                mount(children);
             });
-            children = h(type, props);
-            clearEffects = childrenEffects({
-                root, children
-            });
-            mount(children);
         },
         /**
          * Destroy JSX

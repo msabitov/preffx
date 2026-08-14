@@ -17,57 +17,10 @@ import {
 } from '../utils/core';
 import { matchPath } from '../utils/routing';
 import { childrenEffects } from './children';
-import { PC, APC, PreffXRootParams, SignalWithPrev, DictProxy } from '../types';
+import { PC, APC, SignalWithPrev, DictProxy } from '../types';
+import { pathSymbol, Renderer, routeParamsSymbol, getScope, withScope, RootScope } from '../utils/render';
 
-type StateWithComponentIndex = PreffXRootParams & {index: number;};
 type RoutesPaths = Record<string, PC<any> | APC<any>>;
-
-/**
- * Path pattern symbol
- */
-const pathSymbol = Symbol('preffx-path');
-const routeParamsSymbol = Symbol('preffx-route-params');
-const defaultRootState: Omit<StateWithComponentIndex, 'utils'> = {
-    // component context
-    context: {
-        [pathSymbol]: preactSignal('/'),
-        [routeParamsSymbol]: {}
-    },
-    // component index
-    index: 0
-};
-
-// global state
-const state: {
-    /**
-     * Count of roots
-     */
-    count: number;
-    /**
-     * Root state
-     */
-    root: StateWithComponentIndex;
-} = {
-    count: 0,
-    root: {index: 0} as unknown as StateWithComponentIndex
-};
-
-const RADIX = 36;
-
-export const setRootState = (rootState: PreffXRootParams) => {
-    const {context = {}, ...rest} = rootState;
-    state.root = {
-        ...defaultRootState,
-        context: {
-            ...defaultRootState.context,
-            ...context
-        },
-        ...rest,
-        index: 0
-    };
-    state.count++;
-    if (!state.root.prefix) state.root.prefix = 'fx' + state.count + '_';
-};
 
 // utils
 const isError = (val: any) => val instanceof Error;
@@ -275,26 +228,31 @@ export function component({
     type: Function;
     props: any;
 }) {
-    // prepare ctx
-    const parentState = state.root;
-    const parentUtils = state.root.utils;
-    const parentCtx = parentState.context as Record<string | symbol, any>;
-    const context = {...parentCtx};
+    // current scope — set by createRoot->mount (root scope) or by an enclosing
+    // component body / computed / effect (child scope)
+    const parentScope = getScope();
+    if (!parentScope) throw new Error('component() must be called within a root scope (inside createRoot().mount)');
+
+    // prepare ctx — inherit parent context, extend with routing props
+    const parentCtx = parentScope.context;
+    const context: Record<string | symbol, any> = {...parentCtx};
     if (props[pathSymbol]) context[pathSymbol] = props[pathSymbol];
     const basePath = context[pathSymbol];
     if (props[routeParamsSymbol]) context[routeParamsSymbol] = props[routeParamsSymbol];
     const routeParams = context[routeParamsSymbol];
-    parentState.context = context;
-
-    // counters
-    let componentPrefix = parentState.prefix + (++parentState.index).toString(RADIX) + '-';
-    const counters = {
-        id: 0
+    // child scope: own id counter, but shared component counter/prefix/utils with root
+    const scope: RootScope = {
+        prefix: parentScope.prefix,
+        context,
+        shared: parentScope.shared,
+        utils: parentScope.utils,
+        idCounter: 0
     };
-    const id = () => componentPrefix + (counters.id++).toString(RADIX);
+    // each component gets a unique component prefix within the root mount
+    const componentPrefix = scope.prefix + Renderer.toRadixString(++scope.shared.index) + '-';
+    const id = () => componentPrefix + Renderer.toRadixString(scope.idCounter++);
 
     // prepare lifecycle callbacks
-
     const callbacks: { 
         mount: Set<Function>; 
         destroy: Set<Function>;
@@ -323,16 +281,15 @@ export function component({
     };
     const computed = <T>(fn: () => T, options?: SignalOptions<T>) => {
         const rawSignal = preactComputed(() => {
-            const prevCtx = {...parentState.context};
-            parentState.context = context;
-            let result;
-            try {
-                result = fn();
-            } catch (e) {
-                result = e;
-            }
-            parentState.context = prevCtx;
-            return result as T;
+            return withScope(scope, () => {
+                let result;
+                try {
+                    result = fn();
+                } catch (e) {
+                    result = e;
+                }
+                return result as T;
+            });
         }, options)  as SignalWithPrev;
 
         const dispose = preactEffect(() => {
@@ -347,6 +304,7 @@ export function component({
         });
         return rawSignal;
     };
+    const effect = (fn: () => any) => preactEffect(() => withScope(scope, fn));
 
     /**
      * useState emulation
@@ -416,11 +374,11 @@ export function component({
         });
     };
 
-    // Extract per-root lang signal from context
-    const readonlyLang = parentUtils.lang;
-    const setLang = parentUtils.setLang;
-    const readonlyUrl = parentUtils.url;
-    const navigate = parentUtils.navigate;
+    // Extract per-root lang signal from scope utils
+    const readonlyLang = scope.utils.lang;
+    const setLang = scope.utils.setLang;
+    const readonlyUrl = scope.utils.url;
+    const navigate = scope.utils.navigate;
 
     const dictDisposers: Function[] = [];
 
@@ -480,7 +438,7 @@ export function component({
     };
 
     const utils = {
-        signal, computed, effect: preactEffect,
+        signal, computed, effect,
         untracked, batch, createModel, action,
         // emulations
         state: useState, reducer: useReducer,
@@ -497,9 +455,9 @@ export function component({
         // special components
         Portal, Catch, For, Defer
     };
-    const componentModel = new ComponentModel({
+    const componentModel = withScope(scope, () => new ComponentModel({
         type, props, utils
-    }) as unknown as (TPreffXItem & {root: any;});
+    })) as unknown as (TPreffXItem & {root: any;});
     const componentRoot = componentModel.root;
     onMountCallback(componentRoot, () => {
         callbacks.mount.forEach((fn) => fn());
