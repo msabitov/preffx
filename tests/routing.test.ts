@@ -38,8 +38,8 @@ describe('Routing utils', () => {
         expect(matchPath('/files/*', '/files/docs/readme.txt')).toMatchObject({params: { '*': 'docs/readme.txt' }});
         expect(matchPath('/files/*', '/files/')).toMatchObject({params: { '*': '' }});
         expect(matchPath('/files/*', '/files')).toEqual(null);
-        expect(matchPath('/a/*/c', '/a/x/c')).toEqual(null);     // * не в конце — не wildcard
-        expect(matchPath('/a/*/c', '/a/*/c')).toMatchObject({ matchedText: '/a/*/c' }); // литерал
+        expect(matchPath('/a/*/c', '/a/x/c')).toEqual(null);     // * not at end — not a wildcard
+        expect(matchPath('/a/*/c', '/a/*/c')).toMatchObject({ matchedText: '/a/*/c' }); // literal match
     });
 
     test('special characters', () => {

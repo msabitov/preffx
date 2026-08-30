@@ -46,6 +46,27 @@ export type PreffXRootParams = {
     utils: IntlRootUtils & RoutingRootUtils;
 };
 
+/**
+ * Mount configuration for `root.mount(type, config)`
+ */
+export type PreffXMountConfig = {
+    /**
+     * Optional container to mount into (defaults to `document.body`).
+     * `document` itself is normalized to its `documentElement`.
+     */
+    node?: ParentNode;
+    /**
+     * Props for the root component
+     */
+    props?: object;
+    /**
+     * Parse the server-sent per-root preload data during hydration.
+     * The scope of the payload is the root prefix (`data-preffx-preload`).
+     * @default JSON.parse
+     */
+    parser?: (s: string) => unknown;
+};
+
 export type SignalWithPrev<T = any> = Signal<T> & {prev: T | undefined};
 
 /**
@@ -61,6 +82,32 @@ export type DictProxy<T extends object> = {
 };
 
 type PreffXContext = Record<string | symbol, any>;
+
+/**
+ * Read-only snapshot of a resource's lifecycle
+ */
+export type ResourceState<T = any> = {
+    /**
+     * Resolved data (or `null` while loading / after error).
+     */
+    state: ReadonlySignal<T | null>;
+    /**
+     * Resource is processing 
+     */
+    pending: ReadonlySignal<boolean>;
+    /**
+     * Resource processing error
+     */
+    error: ReadonlySignal<Error | null>;
+};
+
+/**
+ * `resource(fn)` return value
+ */
+export type Resource<T = any> = [
+    result: ResourceState<T>,
+    refetch: () => void
+];
 
 export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
     // signal utils
@@ -145,6 +192,20 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
      * @param init — initial state or factory function
      */
     reducer: <S, A>(fn: (state: S, action: A) => S, init: S | (() => S)) => [ReadonlySignal<S>, (action: A) => void];
+    /**
+     * Async resource
+     * on the server it registers its fetcher for `preload()` instead of running an effect;
+     * on the client it runs a source-tracking effect and returns a tuple `[res, refetch]`
+     * @param fetcher — async function; optional AbortSignal for race-guarding
+     */
+    resource: {
+        <T>(fetcher: (signal?: AbortSignal) => Promise<T>): Resource<T>;
+        <T>(params: {
+            fetcher: (signal?: AbortSignal) => Promise<T>,
+            initial?: T;
+            timeout?: number;
+        }): Resource<T>;
+   };
 
     // lifecycle
 
@@ -218,6 +279,19 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
          */
         value: Signal<any>;
     }>;
+    /**
+     * Suspense boundary around resources
+     */
+    Suspense: PC<{
+        /**
+         * JSX content resolver
+         */
+        callback: () => any;
+        /**
+         * JSX fallback content resolver
+         */
+        fallback?: any;
+    }>;
 }
 
 /**
@@ -228,6 +302,101 @@ export type PC<T extends object = object, C extends PreffXContext = PreffXContex
  * Async PreffX component
  */
 export type APC<T extends object = object, C extends PreffXContext = PreffXContext> = (props: T, utils: PreffXUtils<C>) => Promise<any>;
+
+/**
+ * Root utils type (lang/url/navigate), same shape as preact for component utils
+ */
+export type RootUtils = PreffXRootParams['utils'];
+
+/**
+ * Per-root execution scope. Created once per root in `createRoot`,
+ * then passed down the tree via `withScope`.
+ */
+export type RootScope = {
+    /**
+     * Component id prefix, unique per root (e.g. 'fx1')
+     */
+    prefix: string;
+    /**
+     * Root component context (user-visible)
+     */
+    context: Record<string | symbol, any>;
+    /**
+     * Shared component counter across the whole root.
+     * Reset on each mount
+     */
+    shared: { index: number };
+    /**
+     * Root-specific utils
+     */
+    utils: RootUtils;
+    /**
+     * Per-component id counter
+     */
+    idCounter: number;
+    /**
+     * Shared resource counter across the whole root
+     */
+    resourceIndex: number;
+    /**
+     * SSR resource map (only during server rendering)
+     */
+    resources?: Resources;
+};
+
+/**
+ * A single SSR resource entry
+ */
+export type ResourceEntry = {
+    /**
+     * Data fetcher, shared between SSR and client
+     */
+    fetcher: (signal?: AbortSignal) => Promise<unknown>;
+    /**
+     * Max wait (ms) for this resource during the server preload
+     */
+    timeout?: number;
+    /**
+     * Reactive resolved value
+     */
+    state: Signal<unknown>;
+};
+
+/**
+ * SSR resource map. Absent on the client.
+ */
+export type Resources = Map<string, ResourceEntry>;
+
+/**
+ * An active Suspense boundary while its `callback` is being resolved.
+ */
+export type SuspenseBoundary = {
+    /** Resource keys created inside this boundary (nearest-wins, deduped). */
+    keys: string[];
+    /** Client-side `pending` signals to aggregate for the fallback decision. */
+    pending: Array<ReadonlySignal<boolean>>;
+};
+
+/** Active hydration session: existing DOM elements in walk order (positional matching) */
+export type HydrateQueue = Element[] | undefined;
+
+/**
+ * Options accepted by `renderToString`.
+ */
+export type SSRConfig = {
+    /** Props for the root component. */
+    props?: object;
+    /** Resource serializer. */
+    serializer?: (v: unknown) => string;
+};
+
+export type RenderToStringResult = {
+    /** Resolve every SSR resource, optionally with a per-resource timeout. */
+    preload(timeout?: number): Promise<void>;
+    /** Emit the HTML string (markup + per-root preload script) from the preloaded data. */
+    serialize(): string;
+};
+
 declare global {
     type Booleanish = boolean | "true" | "false";
     type CrossOrigin = "anonymous" | "use-credentials" | "";
@@ -1968,3 +2137,4 @@ declare global {
         }
     }
 }
+

@@ -1,13 +1,15 @@
 {
     "name": "preffx",
-    "version": "0.6.2",
+    "version": "0.7.0",
     "description": "Self-confident DOM reactivity",
     "author": "Marat Sabitov",
     "license": "Apache-2.0",
     "type": "module",
     "scripts": {
         "build": "rollup -c",
-        "test": "vitest"
+        "test": "vitest",
+        "test:node": "vitest --project node",
+        "test:node:run": "vitest run --project node"
     },
     "keywords": [
         "preffx",
@@ -18,31 +20,36 @@
         "front-end",
         "framework"
     ],
+    "types": "./dist/types/index.d.ts",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "sideEffects": false,
     "exports": {
         ".": {
             "types": "./dist/types/index.d.ts",
-            "import": "./dist/index.js",
-            "require": "./dist/index.js"
+            "import": "./dist/index.js"
         },
         "./jsx-runtime": {
             "types": "./dist/types/jsx-runtime.d.ts",
-            "import": "./dist/jsx-runtime.js",
-            "require": "./dist/jsx-runtime.js"
+            "import": "./dist/jsx-runtime.js"
         },
         "./jsx-dev-runtime": {
             "types": "./dist/types/jsx-dev-runtime.d.ts",
-            "import": "./dist/jsx-dev-runtime.js",
-            "require": "./dist/jsx-dev-runtime.js"
+            "import": "./dist/jsx-dev-runtime.js"
+        },
+        "./server": {
+            "types": "./dist/types/server/index.d.ts",
+            "import": "./dist/server.js"
         }
     },
     "dependencies": {
-        "@preact/signals-core": "^1.14.2"
+        "@preact/signals-core": "^1.14.2",
+        "csstype": "^3.2.3"
     },
     "devDependencies": {
         "@rollup/plugin-terser": "^1.0.0",
         "@rollup/plugin-typescript": "^12.3.0",
         "@vitest/browser-playwright": "^4.1.8",
-        "csstype": "^3.2.3",
         "rollup": "^4.59.0",
         "rollup-plugin-cleaner": "^1.0.0",
         "tslib": "^2.8.1",

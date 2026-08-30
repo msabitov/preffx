@@ -56,8 +56,8 @@ describe('Intl', () => {
             const html = globalThis.document.documentElement;
             html.setAttribute('lang', 'en');
 
-            const root = createRoot(rootElement);
-            root.mount(LangDisplayComponent, {});
+            const root = createRoot();
+            root.mount(LangDisplayComponent, { node: rootElement });
             await tick();
 
             const el = rootElement.querySelector('#lang-value');
@@ -70,8 +70,8 @@ describe('Intl', () => {
             const html = globalThis.document.documentElement;
             html.removeAttribute('lang');
 
-            const root = createRoot(rootElement);
-            root.mount(LangDisplayComponent, {});
+            const root = createRoot();
+            root.mount(LangDisplayComponent, { node: rootElement });
             await tick();
 
             const el = rootElement.querySelector('#lang-value');
@@ -81,8 +81,8 @@ describe('Intl', () => {
         });
 
         test('setLang updates lang signal value', async () => {
-            const root = createRoot(rootElement);
-            root.mount(LangControlComponent, {});
+            const root = createRoot();
+            root.mount(LangControlComponent, { node: rootElement });
             await tick();
 
             (rootElement.querySelector('#set-lang-ru') as HTMLButtonElement).click();
@@ -98,8 +98,8 @@ describe('Intl', () => {
             const html = globalThis.document.documentElement;
             html.setAttribute('lang', 'de');
 
-            const root = createRoot(rootElement);
-            root.mount(LangControlComponent, {});
+            const root = createRoot();
+            root.mount(LangControlComponent, { node: rootElement });
             await tick();
 
             (rootElement.querySelector('#set-lang-en') as HTMLButtonElement).click();
@@ -115,8 +115,8 @@ describe('Intl', () => {
             const html = globalThis.document.documentElement;
             html.setAttribute('lang', 'fr');
 
-            const root = createRoot(rootElement);
-            root.mount(LangControlComponent, {});
+            const root = createRoot();
+            root.mount(LangControlComponent, { node: rootElement });
             await tick();
 
             // Initially shows 'fr'
@@ -237,8 +237,8 @@ describe('Intl', () => {
         });
 
         test('sync resolver returns correct dict with current lang', async () => {
-            const root = createRoot(rootElement, { defaultLang: 'en' });
-            root.mount(DictComponent, {});
+            const root = createRoot({ defaultLang: 'en' });
+            root.mount(DictComponent, { node: rootElement });
             await tick(50);
 
             expect(rootElement.querySelector('#dict-title')?.textContent).toBe('Hello');
@@ -248,9 +248,9 @@ describe('Intl', () => {
         });
 
         test('async resolver loads and returns dict', async () => {
-            const root = createRoot(rootElement, { defaultLang: 'ru' });
+            const root = createRoot({ defaultLang: 'ru' });
 
-            root.mount(AsyncDictComponent, {});
+            root.mount(AsyncDictComponent, { node: rootElement });
             await tick(50);
 
             expect(rootElement.querySelector('#async-title')?.textContent).toBe('Привет');
@@ -259,8 +259,8 @@ describe('Intl', () => {
         });
 
         test('language change switches to correct dict', async () => {
-            const root = createRoot(rootElement, { defaultLang: 'en' });
-            root.mount(SwitchDictComponent, {});
+            const root = createRoot({ defaultLang: 'en' });
+            root.mount(SwitchDictComponent, { node: rootElement });
             await tick(50);
 
             expect(rootElement.querySelector('#switch-title')?.textContent).toBe('Hello');
@@ -276,8 +276,8 @@ describe('Intl', () => {
         });
 
         test('fallback to wildcard (*) resolver when language has no specific dict', async () => {
-            const root = createRoot(rootElement, { defaultLang: 'de' });
-            root.mount(WildcardDictComponent, {});
+            const root = createRoot({ defaultLang: 'de' });
+            root.mount(WildcardDictComponent, { node: rootElement });
             await tick(50);
 
             // 'de' is not in resolvers, so '*' fallback should be used → frDict
@@ -303,8 +303,8 @@ describe('Intl', () => {
                 });
             };
 
-            const root = createRoot(rootElement, { defaultLang: 'en' });
-            root.mount(InitialComponent, {});
+            const root = createRoot({ defaultLang: 'en' });
+            root.mount(InitialComponent, { node: rootElement });
             // Check immediately — should show initial before async completes
             await tick(10);
             expect(rootElement.querySelector('#initial-title')?.textContent).toBe('Loading...');
@@ -331,8 +331,8 @@ describe('Intl', () => {
                 });
             };
 
-            const root = createRoot(rootElement, { defaultLang: 'en' });
-            root.mount(ErrorComponent, {});
+            const root = createRoot({ defaultLang: 'en' });
+            root.mount(ErrorComponent, { node: rootElement });
             await tick(50);
 
             // Should be empty dict (no title property) — so textContent should be ''
@@ -342,8 +342,8 @@ describe('Intl', () => {
         });
 
         test('no resolver for lang and no wildcard — empty dict', async () => {
-            const root = createRoot(rootElement, { defaultLang: 'es' });
-            root.mount(UnresolvedDictComponent, {});
+            const root = createRoot({ defaultLang: 'es' });
+            root.mount(UnresolvedDictComponent, { node: rootElement });
             await tick(50);
 
             expect(rootElement.querySelector('#nores-title')?.textContent).toBe('');

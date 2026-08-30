@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { h, Fragment, createRoot, PC } from '../src/index';
 
 function tick(ms: number = 0): Promise<void> {
@@ -257,17 +257,18 @@ describe('PreffX root', () => {
     });
 
     test('create root', () => {
-        const root = createRoot(rootElement);
+        const root = createRoot();
         expect(typeof root.mount).toBe('function');
         expect(typeof root.destroy).toBe('function');
     });
 
     test('mount/destroy root', () => {
-        const root = createRoot(rootElement);
+        const root = createRoot();
         const id = 'div-id';
         root.mount(App,
             {
-                id
+                node: rootElement,
+                props: { id }
             }
         );
         expect(rootElement.firstElementChild?.id).toBe(id);
@@ -277,18 +278,18 @@ describe('PreffX root', () => {
     });
 
     test('several roots', () => {
-        const root = createRoot(rootElement);
+        const root = createRoot();
         root.mount(
             AppWithId,
-            {}
+            { node: rootElement }
         );
         const rootId = rootElement.firstElementChild?.id as string;
         expect(rootId).toMatch(/^fx\d+_1-0$/); // prefix fixed at root creation
 
-        const anotherRoot = createRoot(anotherRootElement);
+        const anotherRoot = createRoot();
         anotherRoot.mount(
             AppWithId,
-            {}
+            { node: anotherRootElement }
         );
         const anotherId = anotherRootElement.firstElementChild?.id as string;
         expect(anotherId).toMatch(/^fx\d+_1-0$/);
@@ -298,7 +299,7 @@ describe('PreffX root', () => {
         // prefix survives destroy → mount (component counters reset, prefix does not)
         root.destroy();
         expect(rootElement.firstElementChild).toBe(null);
-        root.mount(AppWithId, {});
+        root.mount(AppWithId, { node: rootElement });
         expect(rootElement.firstElementChild?.id).toBe(rootId);
 
         root.destroy();
@@ -309,17 +310,17 @@ describe('PreffX root', () => {
     });
 
     test('several roots with custom prefix', () => {
-        const root = createRoot(rootElement, {prefix: 'pre'});
+        const root = createRoot({prefix: 'pre'});
         root.mount(
             AppWithId,
-            {}
+            { node: rootElement }
         );
         expect(rootElement.firstElementChild?.id).toBe('pre1-0');
 
-        const anotherRoot = createRoot(anotherRootElement, {prefix: 'prefix'});
+        const anotherRoot = createRoot({prefix: 'prefix'});
         anotherRoot.mount(
             AppWithId,
-            {}
+            { node: anotherRootElement }
         );
         expect(anotherRootElement.firstElementChild?.id).toBe('prefix1-0');
 
@@ -345,12 +346,10 @@ describe('Reactivity', () => {
     });
 
     test('signal', async () => {
-        const root = createRoot(rootElement);
+        const root = createRoot();
         const initialValue = 2;
         root.mount(
-            ReactiveComponent, {
-                value: initialValue
-            }
+            ReactiveComponent, { node: rootElement, props: { value: initialValue } }
         );
         await tick();
 
@@ -364,12 +363,10 @@ describe('Reactivity', () => {
     });
 
     test('computed', async () => {
-        const root = createRoot(rootElement);
+        const root = createRoot();
         const initialValue = 1;
         root.mount(
-            ReactiveComponent, {
-                value: initialValue
-            }
+            ReactiveComponent, { node: rootElement, props: { value: initialValue } }
         );
         await tick();
 
@@ -383,17 +380,14 @@ describe('Reactivity', () => {
     });
 
     test('effect', async () => {
-        const root = createRoot(rootElement);
+        const root = createRoot();
         const initialValue = 9;
         let valueFromCallback = 0;
         const callback = (value: number) => {
             valueFromCallback = value;
         };
         root.mount(
-            ReactiveComponent, {
-                value: initialValue,
-                callback
-            }
+            ReactiveComponent, { node: rootElement, props: { value: initialValue, callback } }
         );
         await tick();
 
@@ -406,9 +400,9 @@ describe('Reactivity', () => {
     });
 
     test('url', async () => {
-        const root = createRoot(rootElement);
+        const root = createRoot();
         root.mount(
-            RouterComponent, {}
+            RouterComponent, { node: rootElement }
         );
         await tick();
 
@@ -422,8 +416,8 @@ describe('Reactivity', () => {
     });
 
     test('defaultURL sets the initial route without Navigation API', async () => {
-        const root = createRoot(rootElement, { defaultURL: new URL('/home', window.location.origin) });
-        root.mount(RouterComponent, {});
+        const root = createRoot({ defaultURL: new URL('/home', window.location.origin) });
+        root.mount(RouterComponent, { node: rootElement });
         await tick();
 
         // detached routing
@@ -441,8 +435,8 @@ describe('Reactivity', () => {
         });
 
         test('path changes', async () => {
-            const root = createRoot(rootElement);
-            root.mount(AppWithRoutes, {});
+            const root = createRoot();
+            root.mount(AppWithRoutes, { node: rootElement });
 
             await tick();
             expect(rootElement.innerHTML).toContain('<span>Home page</span>');
@@ -459,8 +453,8 @@ describe('Reactivity', () => {
         });
 
         test('handlers receive params', async () => {
-            const root = createRoot(rootElement);
-            root.mount(AppWithRoutesParams, {});
+            const root = createRoot();
+            root.mount(AppWithRoutesParams, { node: rootElement });
             await tick();
             (rootElement.querySelector('a[href="/user/42"]') as HTMLAnchorElement).click();
             expect(rootElement.textContent).toContain('User 42');
@@ -469,8 +463,8 @@ describe('Reactivity', () => {
         });
 
         test('nested routes', async () => {
-            const root = createRoot(rootElement);
-            root.mount(AppWithNestedRoutes, {});
+            const root = createRoot();
+            root.mount(AppWithNestedRoutes, { node: rootElement });
 
             await tick();
             expect(rootElement.innerHTML).toContain('<span>Fallback route</span>');
@@ -500,9 +494,9 @@ describe('Special components', () => {
 
     describe('Fragment', () => {
         test('With children', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             root.mount(
-                Fragment, {
+                Fragment, { node: rootElement, props: {
                     children: [
                         h('p', {
                             children: 'The first paragraph'
@@ -511,7 +505,7 @@ describe('Special components', () => {
                             children: 'The second paragraph'
                         })
                     ]
-                }
+                } }
             );
             await tick();
 
@@ -520,11 +514,9 @@ describe('Special components', () => {
         });
 
         test('Empty', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             root.mount(
-                Fragment, {
-                    children: []
-                }
+                Fragment, { node: rootElement, props: { children: [] } }
             );
             await tick();
 
@@ -535,7 +527,7 @@ describe('Special components', () => {
 
     describe('For', () => {
         test('Signal items', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const initialItems = [
                 {
                     id: 0,
@@ -550,10 +542,7 @@ describe('Special components', () => {
                 }
             ];
             root.mount(
-                ForComponent, {
-                    initialItems,
-                    useProps: false
-                }
+                ForComponent, { node: rootElement, props: { initialItems, useProps: false } }
             );
             await tick();
 
@@ -564,7 +553,7 @@ describe('Special components', () => {
         });
 
         test('Array items', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const initialItems = [
                 {
                     id: 0,
@@ -579,10 +568,7 @@ describe('Special components', () => {
                 }
             ];
             root.mount(
-                ForComponent, {
-                    initialItems,
-                    useProps: true
-                }
+                ForComponent, { node: rootElement, props: { initialItems, useProps: true } }
             );
             await tick();
     
@@ -593,14 +579,11 @@ describe('Special components', () => {
         });
 
         test('Fallback', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const initialItems: string[] = [];
             const fallback = 'No items';
             root.mount(
-                ForComponent, {
-                    initialItems,
-                    fallback
-                }
+                ForComponent, { node: rootElement, props: { initialItems, fallback } }
             );
             await tick();
     
@@ -611,8 +594,8 @@ describe('Special components', () => {
 
     describe('Catch', () => {
         test('No errors — children pass through', async () => {
-            const root = createRoot(rootElement);
-            root.mount(CatchComponent, { hasError: false });
+            const root = createRoot();
+            root.mount(CatchComponent, { node: rootElement, props: { hasError: false } });
             await tick();
     
             expect(rootElement.innerHTML).toBe('<div>Normal content</div>');
@@ -620,9 +603,9 @@ describe('Special components', () => {
         });
     
         test('Static fallback on error', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const fallback = 'Error occurred';
-            root.mount(CatchComponent, { hasError: true, fallback });
+            root.mount(CatchComponent, { node: rootElement, props: { hasError: true, fallback } });
             await tick();
     
             expect(rootElement.innerHTML).toBe(fallback);
@@ -630,11 +613,8 @@ describe('Special components', () => {
         });
     
         test('Function fallback on error', async () => {
-            const root = createRoot(rootElement);
-            root.mount(CatchComponent, {
-                hasError: true,
-                useFunctionFallback: true
-            });
+            const root = createRoot();
+            root.mount(CatchComponent, { node: rootElement, props: { hasError: true, useFunctionFallback: true } });
             await tick();
     
             expect(rootElement.innerHTML).toBe('<div class="error-fallback">Errors: 1</div>');
@@ -644,15 +624,15 @@ describe('Special components', () => {
     
     describe('Portal', () => {
         test('Renders children into portal root', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const portalTarget = document.createElement('div');
             portalTarget.id = 'portal-target';
             document.body.appendChild(portalTarget);
         
-            root.mount(PortalComponent, {
+            root.mount(PortalComponent, { node: rootElement, props: {
                 portalRoot: portalTarget,
                 children: h('span', { id: 'portal-child', children: ['Hello Portal'] })
-            });
+            } });
             await tick();
         
             // Portal content is in the portal target, not the main root
@@ -665,15 +645,15 @@ describe('Special components', () => {
         });
 
         test('Cleans up portal root on destroy', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const portalTarget = document.createElement('div');
             portalTarget.id = 'portal-target';
             document.body.appendChild(portalTarget);
         
-            root.mount(PortalComponent, {
+            root.mount(PortalComponent, { node: rootElement, props: {
                 portalRoot: portalTarget,
                 children: h('span', { children: ['Temporary'] })
-            });
+            } });
             await tick();
             expect(portalTarget.innerHTML).toBe('<span>Temporary</span>');
         
@@ -707,15 +687,15 @@ describe('Special components', () => {
         };
         
         test('Reactive children update inside portal', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const portalTarget = document.createElement('div');
             portalTarget.id = 'portal-target';
             document.body.appendChild(portalTarget);
         
-            root.mount(ReactivePortalComponent, {
+            root.mount(ReactivePortalComponent, { node: rootElement, props: {
                 portalRoot: portalTarget,
                 initialValue: 10
-            });
+            } });
             await tick();
         
             expect(portalTarget.innerHTML).toBe('<span id="portal-value">10</span>');
@@ -731,12 +711,12 @@ describe('Special components', () => {
         });
 
         test('No root — renders nothing', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
         
-            root.mount(PortalComponent, {
+            root.mount(PortalComponent, { node: rootElement, props: {
                 root: null,
                 children: h('span', { children: ['Should not appear'] })
-            });
+            } });
             await tick();
         
             expect(rootElement.innerHTML).toBe('');
@@ -746,17 +726,17 @@ describe('Special components', () => {
 
     describe('Defer', () => {
         test('Renders initial when value is a Promise', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
             const deferredValue = new Promise<string>((resolve) => {
                 setTimeout(() => resolve('Loaded'), 50);
             });
     
-            root.mount(DeferComponent, {
+            root.mount(DeferComponent, { node: rootElement, props: {
                 initialValue: 'Waiting...',
                 deferredValue,
                 isSignal: true,
                 isPromise: true
-            });
+            } });
             await tick();
     
             // Initially shows the initial/fallback value
@@ -770,13 +750,13 @@ describe('Special components', () => {
         });
     
         test('Renders non-promise value immediately', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
     
-            root.mount(DeferComponent, {
+            root.mount(DeferComponent, { node: rootElement, props: {
                 initialValue: 'Fallback',
                 deferredValue: 'Real content',
                 isSignal: true
-            });
+            } });
             await tick();
     
             // Plain value is rendered immediately, no initial shown
@@ -785,13 +765,13 @@ describe('Special components', () => {
         });
     
         test('Switches from promise to plain value reactively', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
     
-            root.mount(DeferComponent, {
+            root.mount(DeferComponent, { node: rootElement, props: {
                 initialValue: 'Loading...',
                 deferredValue: new Promise<string>(() => {}), // never resolves
                 isSignal: true
-            });
+            } });
             await tick();
     
             expect(rootElement.innerHTML).toBe('Loading...');
@@ -799,12 +779,12 @@ describe('Special components', () => {
             // Simulate value change by destroying and recreating with plain value
             root.destroy();
     
-            const root2 = createRoot(rootElement);
-            root2.mount(DeferComponent, {
+            const root2 = createRoot();
+            root2.mount(DeferComponent, { node: rootElement, props: {
                 initialValue: 'Loading...',
                 deferredValue: 'Now loaded',
                 isSignal: true
-            });
+            } });
             await tick();
     
             expect(rootElement.innerHTML).toBe('Now loaded');
@@ -812,7 +792,7 @@ describe('Special components', () => {
         });
     
         test('Reactivity — updates when signal value changes', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
     
             // Use a custom component that can change the signal
             const DynamicDefer: PC<{
@@ -837,11 +817,11 @@ describe('Special components', () => {
                 });
             };
     
-            root.mount(DynamicDefer, {
+            root.mount(DynamicDefer, { node: rootElement, props: {
                 initialValue: 'Pending...',
                 finalValue: 'Resolved!',
                 delay: 20
-            });
+            } });
             await tick();
     
             expect(rootElement.innerHTML).toBe('Pending...');
@@ -854,7 +834,7 @@ describe('Special components', () => {
         });
     
         test('Array children via Defer', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
     
             const ArrayDefer: PC = (_, { signal, Defer }) => {
                 const items = signal([
@@ -868,7 +848,7 @@ describe('Special components', () => {
                 });
             };
     
-            root.mount(ArrayDefer, {});
+            root.mount(ArrayDefer, { node: rootElement });
             await tick();
     
             expect(rootElement.innerHTML).toBe(
@@ -878,13 +858,13 @@ describe('Special components', () => {
         });
     
         test('Cleanup on destroy', async () => {
-            const root = createRoot(rootElement);
+            const root = createRoot();
     
-            root.mount(DeferComponent, {
+            root.mount(DeferComponent, { node: rootElement, props: {
                 initialValue: 'Temp',
                 deferredValue: new Promise<string>(() => {}),
                 isSignal: true
-            });
+            } });
             await tick();
     
             expect(rootElement.innerHTML).toBe('Temp');
@@ -919,8 +899,8 @@ describe('Component lifecycle — mount / unmount', () => {
             return h('div', { children: ['mounted'] });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(MountTracker, {});
+        const root = createRoot();
+        root.mount(MountTracker, { node: rootElement });
         await tick();
 
         expect(mountFired).toBe(true);
@@ -935,8 +915,8 @@ describe('Component lifecycle — mount / unmount', () => {
             return h('div', { children: ['x'] });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(MountCounter, {});
+        const root = createRoot();
+        root.mount(MountCounter, { node: rootElement });
         await tick();
         expect(mountCount).toBe(1);
 
@@ -957,8 +937,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(ChildChecker, {});
+        const root = createRoot();
+        root.mount(ChildChecker, { node: rootElement });
         await tick();
 
         expect(childInDom).toBe(true);
@@ -980,8 +960,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(Outer, {});
+        const root = createRoot();
+        root.mount(Outer, { node: rootElement });
         await tick();
 
         expect(innerMounted).toBe(true);
@@ -1008,8 +988,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(RootWithFragment, {});
+        const root = createRoot();
+        root.mount(RootWithFragment, { node: rootElement });
         await tick();
 
         expect(aMounted).toBe(true);
@@ -1031,8 +1011,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(OuterOrder, {});
+        const root = createRoot();
+        root.mount(OuterOrder, { node: rootElement });
         await tick();
 
         expect(order).toEqual(['child', 'parent']);
@@ -1048,8 +1028,8 @@ describe('Component lifecycle — mount / unmount', () => {
             return h('div', { children: ['temp'] });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(DestroyTracker, {});
+        const root = createRoot();
+        root.mount(DestroyTracker, { node: rootElement });
         await tick();
         expect(destroyed).toBe(false);
 
@@ -1065,8 +1045,8 @@ describe('Component lifecycle — mount / unmount', () => {
             return h('div', { children: ['x'] });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(DestroyCounter, {});
+        const root = createRoot();
+        root.mount(DestroyCounter, { node: rootElement });
         await tick();
 
         root.destroy();
@@ -1089,8 +1069,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(OuterDestroy, {});
+        const root = createRoot();
+        root.mount(OuterDestroy, { node: rootElement });
         await tick();
 
         root.destroy();
@@ -1114,8 +1094,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(OuterDestroyOrder, {});
+        const root = createRoot();
+        root.mount(OuterDestroyOrder, { node: rootElement });
         await tick();
 
         root.destroy();
@@ -1143,8 +1123,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(RootWithFragmentDestroy, {});
+        const root = createRoot();
+        root.mount(RootWithFragmentDestroy, { node: rootElement });
         await tick();
 
         root.destroy();
@@ -1155,8 +1135,8 @@ describe('Component lifecycle — mount / unmount', () => {
     });
 
     test('DOM nodes are removed after destroy', async () => {
-        const root = createRoot(rootElement);
-        root.mount(App, { id: 'test-id' });
+        const root = createRoot();
+        root.mount(App, { node: rootElement, props: { id: 'test-id' } });
         await tick();
 
         expect(rootElement.firstElementChild).toBeTruthy();
@@ -1179,9 +1159,9 @@ describe('Component lifecycle — mount / unmount', () => {
             return h('span', { children: [props.n] });
         };
 
-        const root = createRoot(rootElement);
+        const root = createRoot();
 
-        root.mount(CycleComponent, { n: 1 });
+        root.mount(CycleComponent, { node: rootElement, props: { n: 1 } });
         await tick();
         expect(rootElement.innerHTML).toBe('<span>1</span>');
 
@@ -1189,7 +1169,7 @@ describe('Component lifecycle — mount / unmount', () => {
         await tick();
         expect(rootElement.innerHTML).toBe('');
 
-        root.mount(CycleComponent, { n: 2 });
+        root.mount(CycleComponent, { node: rootElement, props: { n: 2 } });
         await tick();
         expect(rootElement.innerHTML).toBe('<span>2</span>');
 
@@ -1197,7 +1177,7 @@ describe('Component lifecycle — mount / unmount', () => {
         await tick();
         expect(rootElement.innerHTML).toBe('');
 
-        root.mount(CycleComponent, { n: 3 });
+        root.mount(CycleComponent, { node: rootElement, props: { n: 3 } });
         await tick();
         expect(rootElement.innerHTML).toBe('<span>3</span>');
 
@@ -1234,8 +1214,8 @@ describe('Component lifecycle — mount / unmount', () => {
             });
         };
 
-        const root = createRoot(rootElement);
-        root.mount(ForList, {});
+        const root = createRoot();
+        root.mount(ForList, { node: rootElement });
         await tick();
 
         expect(mountOrder).toEqual([1, 2, 3]);
@@ -1246,3 +1226,95 @@ describe('Component lifecycle — mount / unmount', () => {
         expect(destroyOrder).toEqual([1, 2, 3]);
     });
 });
+
+describe('Hydrate existing DOM', () => {
+    let hydRoot: HTMLDivElement;
+
+    beforeEach(() => {
+        hydRoot = globalThis.document.createElement('div');
+        hydRoot.id = 'hyd2-app';
+        globalThis.document.body.appendChild(hydRoot);
+    });
+
+    afterEach(() => {
+        hydRoot.remove();
+    });
+
+    test('mount reuses the server element in-place (positional, no markers)', async () => {
+        // Server markup rendered by `renderToString` carries no markers — the
+        // client reuses the existing elements purely by position in the walk.
+        hydRoot.innerHTML =
+            '<div id="card">' +
+                '<span id="lbl">server-text</span>' +
+            '</div>' +
+            // Per-root preload script scoped by the root prefix enables hydration.
+            '<script data-preffx-preload="app" type="application/json">{}</script>';
+
+        // Keep references to the server-created nodes BEFORE mounting.
+        const cardEl = hydRoot.querySelector('#card')!;
+        const spanEl = hydRoot.querySelector('#lbl')!;
+
+        // A client component that builds the same tree in the same order.
+        const HydApp: PC = () => h('div', {
+            id: 'card',
+            children: [
+                h('span', {
+                    id: 'lbl',
+                    children: ['server-text']
+                })
+            ]
+        });
+
+        const root = createRoot({ prefix: 'app' });
+        root.mount(HydApp, { node: hydRoot });
+        await tick(0);
+
+        // The exact same DOM nodes are reused — nothing was recreated.
+        expect(hydRoot.querySelector('#card')).toBe(cardEl);
+        expect(hydRoot.querySelector('#lbl')).toBe(spanEl);
+        // Reactivity attaches to the reused nodes; text stays correct.
+        expect(spanEl.textContent).toBe('server-text');
+
+        root.destroy();
+    });
+
+    test('reactivity binds to the hydrated node in-place (node count stable)', async () => {
+        hydRoot.innerHTML =
+            '<button id="btn">0</button>' +
+            // Per-root preload script scoped by the root prefix enables hydration.
+            '<script data-preffx-preload="app" type="application/json">{}</script>';
+
+        const btn = hydRoot.querySelector('#btn')!;
+        let clicked = 0;
+
+        // Uses a signal for the label: reactively increments on click.
+        const CounterApp: PC = (_, { signal }) => {
+            const count = signal(0);
+            return h('button', {
+                id: 'btn',
+                onClick: () => { clicked++; count.value += 1; },
+                children: [count]
+            });
+        };
+
+        const root = createRoot({ prefix: 'app' });
+        root.mount(CounterApp, { node: hydRoot });
+        await tick(0);
+
+        // Same button element was hydrated (existing node reused).
+        expect(hydRoot.querySelector('#btn')).toBe(btn);
+        // Signal rendered initial value 0 into the existing text node.
+        expect(btn.textContent).toBe('0');
+        // There's exactly one text node — hydration didn't stack duplicates.
+        expect(btn.childNodes.length).toBe(1);
+
+        // Interact: the hydrated node is reactive in-place.
+        btn.dispatchEvent(new MouseEvent('click'));
+        await tick(0);
+        expect(btn.textContent).toBe('1');
+        expect(clicked).toBe(1);
+
+        root.destroy();
+    });
+});
+

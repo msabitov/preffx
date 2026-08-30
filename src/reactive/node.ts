@@ -1,7 +1,7 @@
 import { createModel, effect, Signal } from '@preact/signals-core';
 import { mount, destroy, onMountCallback, onDestroyCallback, isSignal, resolveValue, TPreffXItem } from '../utils/core';
 import { childrenEffects } from './children';
-import { Renderer } from '../utils/render';
+import { Renderer, ssrNode } from '../utils/render';
 
 // utils
 const resolveRef = (ref: Signal | ((node: Node | null) => void), value: Node | null = null) => {
@@ -111,7 +111,7 @@ const nodeEffects = ({
     return model[Symbol.dispose];
 };
 
-export const node = ({
+export const node = Renderer.isServerSide() ? ssrNode : ({
     type,
     props
 }: {
@@ -127,9 +127,12 @@ export const node = ({
         ...clearProps
     } = props;
 
-    const node = Renderer.createElement($ns, type, props && props.is ? {
+    // during active hydration reuse the existing server-rendered
+    // element (positional matching) instead of materialising a fresh one.
+    const hydratedNode = Renderer.isHydrateActive() ? Renderer.takeHydrateNode() : undefined;
+    const node = (hydratedNode || Renderer.createElement($ns, type, props && props.is ? {
         is: props.is
-    } : undefined) as unknown as (Node & TPreffXItem);
+    } : undefined)) as unknown as (Node & TPreffXItem);
 
     // reactive node
     const clearNodeEffects = nodeEffects({node, props: clearProps})

@@ -10,33 +10,35 @@ const banner = `/*
 * @license ${json.license}
 */`;
 
-const output =  {
-    dir: 'dist',
-    banner,
-    format: 'es',
-    plugins: [
-        terser()
-    ]
+const inputs = {
+    index: 'src/index.ts',
+    'jsx-runtime': 'src/jsx-runtime.ts',
+    'jsx-dev-runtime': 'src/jsx-dev-runtime.ts',
+    server: 'src/server/index.ts'
 };
+
 const tsPlugin = typescript({
     tsconfig: 'tsconfig.json'
 });
 
-export default [
-    {
-        input: {
-            index: 'src/index.ts',
-            'jsx-runtime':  'src/jsx-runtime.ts',
-            'jsx-dev-runtime':  'src/jsx-dev-runtime.ts'
-        },
-        output,
-        plugins: [
-            cleaner({
-                targets: [
-                  './dist/'
-                ]
-            }),
-            tsPlugin
-        ]
-    }
-];
+export default {
+    input: inputs,
+    output: {
+        dir: 'dist',
+        banner,
+        format: 'es',
+        plugins: [terser()],
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        manualChunks(id) {
+            // force the SSR-identity-critical modules into a single shared chunk
+            if (/(render|core)\.ts$/.test(id)) {
+                return 'core';
+            }
+        }
+    },
+    plugins: [
+        cleaner({ targets: ['./dist/'] }),
+        tsPlugin
+    ]
+};

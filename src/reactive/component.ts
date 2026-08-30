@@ -17,8 +17,9 @@ import {
 } from '../utils/core';
 import { matchPath } from '../utils/routing';
 import { childrenEffects } from './children';
-import { PC, APC, SignalWithPrev, DictProxy } from '../types';
-import { pathSymbol, Renderer, routeParamsSymbol, getScope, withScope, RootScope } from '../utils/render';
+import { PC, APC, SignalWithPrev, DictProxy, RootScope, SuspenseBoundary } from '../types';
+import { pathSymbol, Renderer, routeParamsSymbol, SuspenseNode } from '../utils/render';
+import { createResource } from './resource';
 
 type RoutesPaths = Record<string, PC<any> | APC<any>>;
 
@@ -150,7 +151,7 @@ const For: PC<{
 const Portal: PC<{
     root: HTMLElement;
     children?: any | any[];
-}> = ({root, children}, {
+}> = Renderer.isServerSide() ? ({children}) => null : ({root, children}, {
     onDestroy
 }) => {
     if (root) {
@@ -164,6 +165,23 @@ const Portal: PC<{
         });
     }
     return null;
+};
+
+/**
+ * `<Suspense>` boundary — a data boundary around resources
+ */
+const Suspense: PC<{
+    callback: () => any;
+    fallback?: any;
+}> = Renderer.isServerSide() ? ({ callback, fallback }) => {
+        const boundary: SuspenseBoundary = { keys: [], pending: [] };
+        const content = Renderer.inBoundary(boundary, callback);
+        return new SuspenseNode(content, fallback, boundary.keys);
+} : ({ callback, fallback }, { computed }) => {
+    const boundary: SuspenseBoundary = { keys: [], pending: [] };
+    const content = Renderer.inBoundary(boundary, callback);
+    const pending = computed(() => boundary.pending.some((s) => s.value));
+    return computed(() => (pending.value ? fallback : content));
 };
 
 // reactive component
@@ -228,9 +246,7 @@ export function component({
     type: Function;
     props: any;
 }) {
-    // current scope — set by createRoot->mount (root scope) or by an enclosing
-    // component body / computed / effect (child scope)
-    const parentScope = getScope();
+    const parentScope = Renderer.getScope();
     if (!parentScope) throw new Error('component() must be called within a root scope (inside createRoot().mount)');
 
     // prepare ctx — inherit parent context, extend with routing props
@@ -242,10 +258,8 @@ export function component({
     const routeParams = context[routeParamsSymbol];
     // child scope: own id counter, but shared component counter/prefix/utils with root
     const scope: RootScope = {
-        prefix: parentScope.prefix,
+        ...parentScope,
         context,
-        shared: parentScope.shared,
-        utils: parentScope.utils,
         idCounter: 0
     };
     // each component gets a unique component prefix within the root mount
@@ -281,14 +295,17 @@ export function component({
     };
     const computed = <T>(fn: () => T, options?: SignalOptions<T>) => {
         const rawSignal = preactComputed(() => {
-            return withScope(scope, () => {
-                let result;
-                try {
-                    result = fn();
-                } catch (e) {
-                    result = e;
+            return Renderer.withScope({
+                scope,
+                    callback: () => {
+                    let result;
+                    try {
+                        result = fn();
+                    } catch (e) {
+                        result = e;
+                    }
+                    return result as T;
                 }
-                return result as T;
             });
         }, options)  as SignalWithPrev;
 
@@ -304,7 +321,12 @@ export function component({
         });
         return rawSignal;
     };
-    const effect = (fn: () => any) => preactEffect(() => withScope(scope, fn));
+    const effect = (fn: () => any) => preactEffect(() => Renderer.withScope({
+        scope,
+        callback: fn
+    }));
+
+    const resource = createResource({ scope, componentPrefix, signal, effect, onDestroy: onDestroyCallback, batch });
 
     /**
      * useState emulation
@@ -437,8 +459,27 @@ export function component({
         });
     };
 
+    const ssr = Renderer.isServerSide();
+    // swap reactive primitives for static equivalents
+    const sig = <T>(arg: T, options?: SignalOptions<T>): Signal<T> =>
+        ssr ? preactSignal(arg, options) as SignalWithPrev
+            : signal(arg, options);
+    const comp = <T>(fn: () => T, options?: SignalOptions<T>) =>
+        ssr ? preactComputed(() => Renderer.withScope({
+            scope,
+            callback: () => {
+                try { return fn(); } catch (e) { return e as T; }
+            }})) as SignalWithPrev<T>
+            : computed(fn, options);
+    const eff = (fn: () => any) => {
+        if (ssr) { Renderer.withScope({
+            scope, callback: fn
+        }); return () => {}; }
+        return effect(fn);
+    };
+
     const utils = {
-        signal, computed, effect,
+        signal: sig, computed: comp, effect: eff,
         untracked, batch, createModel, action,
         // emulations
         state: useState, reducer: useReducer,
@@ -453,11 +494,23 @@ export function component({
         // lifecycle
         onMount, onDestroy,
         // special components
-        Portal, Catch, For, Defer
+        Portal, Catch, For, Defer, Suspense,
+        // resources
+        resource
     };
-    const componentModel = withScope(scope, () => new ComponentModel({
-        type, props, utils
-    })) as unknown as (TPreffXItem & {root: any;});
+
+    if (ssr) {
+        return Renderer.withScope({
+            scope,
+            callback: () => type({...props}, utils)
+        });
+    }
+    const componentModel = Renderer.withScope({
+        scope,
+        callback: () => new ComponentModel({
+            type, props, utils
+        })
+    }) as unknown as (TPreffXItem & {root: any;});
     const componentRoot = componentModel.root;
     onMountCallback(componentRoot, () => {
         callbacks.mount.forEach((fn) => fn());

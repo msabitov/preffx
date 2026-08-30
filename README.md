@@ -56,6 +56,32 @@ npm run dev
 
 You can also try [StackBlitz demo](https://stackblitz.com/edit/vitejs-preffx?file=src%2FApp.tsx)
 
+## Quick start
+
+Create a root and mount your component:
+
+```tsx
+import { createRoot } from 'preffx';
+import { App } from './App';
+
+createRoot().mount(App, { node: document.getElementById('app')! });
+```
+
+Define the component — props and utilities come as arguments:
+
+```tsx
+import type { PC } from 'preffx';
+
+export const App: PC = (props, { signal }) => {
+    const count = signal(0);
+    return (
+        <button onClick={() => { count.value += 1 }}>
+            Count is {count}
+        </button>
+    );
+};
+```
+
 ## Examples
 
 - Simple counter:

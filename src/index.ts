@@ -1,10 +1,9 @@
-import type { PC, APC, PreffXRootParams } from './types';
-import { node } from './reactive/node';
-import { component, Fragment } from './reactive/component';
+import type { PC, APC, PreffXRootParams, RootScope, PreffXMountConfig } from './types';
+import { h, Fragment } from './h';
 import { childrenEffects } from './reactive/children';
-import { destroy, isArray, mount } from './utils/core';
+import { destroy, mount, PREFFX_PRELOAD_ATTR } from './utils/core';
 import { signal as preactSignal, computed as preactComputed } from '@preact/signals-core';
-import { withScope, pathSymbol, routeParamsSymbol, createRootScope, RootScope } from './utils/render';
+import { Renderer } from './utils/render';
 
 export type { PC, APC };
 
@@ -13,47 +12,28 @@ export type { PC, APC };
  */
 export { Fragment };
 
-/**
- * Create PreffX reactive nodes/components
- */
-export function h(
-    /**
-     * The node name or Component constructor
-     */
-    type: string | Function,
-    /**
-     * The properties of the virtual node
-     */
-    rawProps: Record<string, any>
-) {
-    const props = rawProps ? {...rawProps} : {};
-    // children should be array
-    if (Object.hasOwn(props, 'children') && !isArray(props.children)) props.children = [props.children];
-    // create component
-    if (typeof type === 'function') {
-        // returns component signal
-        return component({
-            type,
-            props
-        });
-    }
-    // returns node
-    return node({
-        type,
-        props
-    });
-};
+export { h };
 
-let ROOT_COUNT = 0;
+/**
+ * Collect every element under `root` in post-order
+ * (children before their parent).
+ */
+const collectPostOrder = (root: ParentNode, acc: Element[] = []): Element[] => [...root.children].reduce((acc, child) => {
+    collectPostOrder(child, acc);
+    if (child.hasAttribute?.(PREFFX_PRELOAD_ATTR)) return acc;
+    acc.push(child);
+    return acc;
+}, acc);
 
 /**
  * Create PreffX root
  */
-export function createRoot(node: ParentNode, params?: Omit<PreffXRootParams, 'utils'>) {
-    let root: ParentNode;
-    if (node == document) {
-        root = document.documentElement;
-    } else root = node || document.body;
+export function createRoot(params?: Omit<PreffXRootParams, 'utils'>) {
+    let root!: ParentNode;
+    const resolveRoot = (n?: ParentNode): ParentNode => {
+        if (n) return n == document ? document.documentElement : n;
+        return globalThis.document?.body;
+    };
 
     let clearEffects: Function;
     let children: any;
@@ -124,36 +104,73 @@ export function createRoot(node: ParentNode, params?: Omit<PreffXRootParams, 'ut
         url: readonlyUrl, navigate: navigate as unknown as Navigation['navigate']
     };
 
-    // the root prefix is fixed at root creation time (even before mount),
-    const prefix = params?.prefix || 'fx' + (++ROOT_COUNT) + '_';
-
     // root-specific utils (lang, url, navigate) and user-provided context,
     // shared across every mount of this root
     const utils = rootUtils;
-    const baseContext: Record<string | symbol, any> = {
-        ...(params?.context || {}),
-        [pathSymbol]: preactSignal('/'),
-        [routeParamsSymbol]: {}
-    };
-
-    // shared per-root context object that gets copied per mount (so a fresh
-    // context is used each mount, while the routing symbols stay consistent)
+    const baseContext: Record<string | symbol, any> = Renderer.createContext(params?.context);
     const rootContext: Record<string | symbol, any> = {...baseContext};
+    const rootScope: RootScope = Renderer.createRootScope(params?.prefix, utils, rootContext);
 
     return {
         /**
-         * Mount JSX
-         * @param content - JSX to render
+         * Mount JSX.
+         * @param type - root component function
+         * @param config - mount configuration:
+         *   - `node`   — optional container to mount into (defaults to`document.body`)
+         *   - `props`  — props for the root component
+         *   - `parser` — parser for the root's per-prefix preload script
          */
-        mount<T extends object>(type: PC<T> | APC<T>, props: object = {}) {
-            // fresh scope per mount: counters reset, but the root prefix stays
-            const scope: RootScope = createRootScope(prefix, utils, {...rootContext});
-            withScope(scope, () => {
-                children = h(type, props);
-                clearEffects = childrenEffects({
-                    root, children
-                });
-                mount(children);
+        mount<T extends object>(
+            type: PC<T> | APC<T>,
+            config: PreffXMountConfig = {}
+        ): void {
+            const {
+                node,
+                props = {},
+                parser = JSON.parse
+            } = config;
+            root = resolveRoot(node);
+            const deserialize = (raw: string): Record<string, unknown> | undefined => {
+                try {
+                    const parsed = parser(raw);
+                    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : undefined;
+                } catch {
+                    return undefined;
+                }
+            };
+            let hydrated: Record<string, unknown> | undefined;
+            let queue: Element[] | undefined;
+            if (globalThis.document) {
+                // Per-root preload script scoped by the root prefix
+                let preloadedDataContainer: Element | null = null;
+                for (const el of root.querySelectorAll(`script[${PREFFX_PRELOAD_ATTR}]`)) {
+                    if (el.getAttribute(PREFFX_PRELOAD_ATTR) === rootScope.prefix) {
+                        preloadedDataContainer = el;
+                        break;
+                    }
+                }
+                if (preloadedDataContainer) {
+                    const data = deserialize(preloadedDataContainer.textContent || '');
+                    if (data) {
+                        hydrated = data;
+                        // Positional queue of every existing element in build-order (post-order)
+                        queue = collectPostOrder(root);
+                    }
+                    preloadedDataContainer.remove();
+                }
+            }
+            if (hydrated) Renderer.setHydratedData(hydrated);
+            const scope: RootScope = Renderer.resetScope(rootScope, {...rootContext});
+            Renderer.withRootScope({
+                scope,
+                callback: () => {
+                    children = h(type, props);
+                    clearEffects = childrenEffects({
+                        root, children
+                    });
+                    mount(children);
+                },
+                queue
             });
         },
         /**

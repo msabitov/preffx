@@ -1,14 +1,7 @@
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
-export default defineConfig({
-    test: {
-        browser: {
-            enabled: true,
-            provider: playwright(),
-            instances: [{ browser: 'chromium' }]
-        },
-    },
+const jsxConfig = {
     oxc: {
         jsx: {
             development: false,
@@ -16,5 +9,37 @@ export default defineConfig({
             pragmaFrag: 'Fragment',
             pragma: 'h'
         }
+    }
+};
+
+export default defineConfig({
+    test: {
+        projects: [
+            {
+                // DOM/browser tests require a real browser.
+                extends: true,
+                test: {
+                    name: 'browser',
+                    include: ['tests/**/*.{test,spec}.{ts,tsx}'],
+                    exclude: ['tests/ssr/**'],
+                    browser: {
+                        enabled: true,
+                        provider: playwright(),
+                        instances: [{ browser: 'chromium' }]
+                    }
+                },
+                ...jsxConfig
+            },
+            {
+                // Server-side rendering tests run in a plain Node environment
+                extends: true,
+                test: {
+                    name: 'node',
+                    environment: 'node',
+                    include: ['tests/ssr/**/*.{test,spec}.{ts,tsx}']
+                },
+                ...jsxConfig
+            }
+        ],
     },
 });

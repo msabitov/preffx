@@ -1,4 +1,5 @@
 import { Signal } from '@preact/signals-core';
+import { Renderer } from './render';
 
 // types
 export type TPreffXItem = {
@@ -8,6 +9,8 @@ export type TPreffXItem = {
 const mountSymbol = Symbol('PreffX.mount');
 const destroySymbol = Symbol('PreffX.destroy');
 export const SIGNAL_MARKER = Symbol('preffx-signal-marker');
+// per-root preload script attribute: `<script data-preffx-preload="<root prefix>">`
+export const PREFFX_PRELOAD_ATTR = 'data-preffx-preload';
 // base utils
 export const isArray = (val: any) => Array.isArray(val);
 export const isSignal = (val: any) => val instanceof Signal || val?.[SIGNAL_MARKER];
@@ -18,8 +21,8 @@ export const resolveDeepValue = (arg: any): any => {
     if (Array.isArray(arg)) return arg.map(resolveDeepValue).flat();
     else if (isSignal(arg)) return resolveDeepValue(arg.value);
     else if (isNode(arg)) return arg;
-    else if (isPromise(arg) || arg === null || arg === undefined || typeof arg === 'boolean') return document.createTextNode('');
-    else return document.createTextNode(arg + '');
+    else if (isPromise(arg) || arg === null || arg === undefined || typeof arg === 'boolean') return Renderer.createTextNode('');
+    else return Renderer.createTextNode(arg);
 };
 
 export const resolveDeepRawValue = (arg: any): any => {

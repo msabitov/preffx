@@ -1,5 +1,5 @@
 import './types';
-import { h, Fragment } from '.';
+import { h, Fragment } from './h';
 
 function jsx(type: any, props: any) {
   return h(type, props);

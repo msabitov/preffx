@@ -38,8 +38,8 @@ describe('Component utils', () => {
         };
 
         test('each call returns new ID', async () => {
-            const root = createRoot(rootElement);
-            root.mount(Component, {});
+            const root = createRoot();
+            root.mount(Component, { node: rootElement });
             await tick();
 
             expect(rootElement.innerHTML).toBe('<div id="fx1_1-0"><span id="fx1_1-1"></span></div>');
@@ -48,11 +48,11 @@ describe('Component utils', () => {
         });
 
         test('each root has its own IDs', async () => {
-            const root = createRoot(rootElement);
-            root.mount(Component, {});
+            const root = createRoot();
+            root.mount(Component, { node: rootElement });
 
-            const anotherRoot = createRoot(anotherRootElement);
-            anotherRoot.mount(Component, {});
+            const anotherRoot = createRoot();
+            anotherRoot.mount(Component, { node: anotherRootElement });
             await tick();
 
             expect(rootElement.outerHTML).not.toBe(anotherRootElement.outerHTML);
@@ -97,8 +97,8 @@ describe('Component utils', () => {
         };
 
         test('renders initial value', async () => {
-            const root = createRoot(rootElement);
-            root.mount(StateComponent, { initialValue: 10 });
+            const root = createRoot();
+            root.mount(StateComponent, { node: rootElement, props: { initialValue: 10 } });
             await tick();
 
             const el = rootElement.querySelector('#state-value');
@@ -108,8 +108,8 @@ describe('Component utils', () => {
         });
 
         test('setter updates the value directly', async () => {
-            const root = createRoot(rootElement);
-            root.mount(StateComponent, { initialValue: 0 });
+            const root = createRoot();
+            root.mount(StateComponent, { node: rootElement, props: { initialValue: 0 } });
             await tick();
 
             const btn = rootElement.querySelector('#state-set') as HTMLButtonElement;
@@ -123,8 +123,8 @@ describe('Component utils', () => {
         });
 
         test('functional setter (prev => next)', async () => {
-            const root = createRoot(rootElement);
-            root.mount(StateComponent, { initialValue: 5 });
+            const root = createRoot();
+            root.mount(StateComponent, { node: rootElement, props: { initialValue: 5 } });
             await tick();
 
             const btn = rootElement.querySelector(
@@ -154,8 +154,8 @@ describe('Component utils', () => {
                 });
             };
 
-            const root = createRoot(rootElement);
-            root.mount(StepComponent, {});
+            const root = createRoot();
+            root.mount(StepComponent, { node: rootElement });
             await tick();
 
             const btn = rootElement.querySelector('#step-inc') as HTMLButtonElement;
@@ -193,8 +193,8 @@ describe('Component utils', () => {
                 });
             };
 
-            const root = createRoot(rootElement);
-            root.mount(MultiStateComponent, {});
+            const root = createRoot();
+            root.mount(MultiStateComponent, { node: rootElement });
             await tick();
 
             expect(rootElement.querySelector('#multi-a')?.textContent).toBe(
@@ -260,8 +260,8 @@ describe('Component utils', () => {
         };
 
         test('renders initial value', async () => {
-            const root = createRoot(rootElement);
-            root.mount(ReducerComponent, { initial: 100 });
+            const root = createRoot();
+            root.mount(ReducerComponent, { node: rootElement, props: { initial: 100 } });
             await tick();
 
             const el = rootElement.querySelector('#reducer-value');
@@ -271,8 +271,8 @@ describe('Component utils', () => {
         });
 
         test('dispatch — increment action', async () => {
-            const root = createRoot(rootElement);
-            root.mount(ReducerComponent, { initial: 0 });
+            const root = createRoot();
+            root.mount(ReducerComponent, { node: rootElement, props: { initial: 0 } });
             await tick();
 
             (rootElement.querySelector('#reducer-inc') as HTMLButtonElement).click();
@@ -285,8 +285,8 @@ describe('Component utils', () => {
         });
 
         test('multiple dispatches accumulate state', async () => {
-            const root = createRoot(rootElement);
-            root.mount(ReducerComponent, { initial: 10 });
+            const root = createRoot();
+            root.mount(ReducerComponent, { node: rootElement, props: { initial: 10 } });
             await tick();
 
             (rootElement.querySelector('#reducer-inc') as HTMLButtonElement).click();
@@ -306,8 +306,8 @@ describe('Component utils', () => {
         });
 
         test('dispatch with payload action', async () => {
-            const root = createRoot(rootElement);
-            root.mount(ReducerComponent, { initial: 0 });
+            const root = createRoot();
+            root.mount(ReducerComponent, { node: rootElement, props: { initial: 0 } });
             await tick();
 
             (rootElement.querySelector('#reducer-add') as HTMLButtonElement).click();
@@ -328,8 +328,8 @@ describe('Component utils', () => {
                 return h('span', { id: 'lazy-reducer', children: [count] });
             };
 
-            const root = createRoot(rootElement);
-            root.mount(LazyReducerComponent, { multiplier: 7 });
+            const root = createRoot();
+            root.mount(LazyReducerComponent, { node: rootElement, props: { multiplier: 7 } });
             await tick();
 
             const el = rootElement.querySelector('#lazy-reducer');
