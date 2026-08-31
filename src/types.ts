@@ -4,7 +4,6 @@ import {
     action, createModel,
     ReadonlySignal
 } from "@preact/signals-core";
-import * as CSS from "csstype";
 
 /**
  * Root specific utils for i18n
@@ -810,15 +809,13 @@ declare global {
 
         interface EventHandlers extends ModifiedEventHandlers<NativeEventHandlers> {}
 
-        export interface CSSProperties extends CSS.Properties<string | number> {
-            /**
-             * The index signature was removed to enable closed typing for style
-             * using CSSType. You're able to use type assertion or module augmentation
-             * to add properties or an index signature of your own.
-             *
-             * For examples and more information, visit:
-             * https://github.com/frenic/csstype#what-should-i-do-when-i-get-type-errors
-             */
+        /**
+         * Default type for the `style` attribute
+         * @description
+         * Install `csstype` yourself if you want strict, auto-completed CSS properties
+         */
+        export interface CSSProperties {
+            [key: string]: string | number | undefined;
         }
 
         // All the WAI-ARIA 1.1 role attribute values from https://www.w3.org/TR/wai-aria-1.1/#role_definitions

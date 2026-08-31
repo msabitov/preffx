@@ -16,7 +16,7 @@
 
 </div>
 
-PreffX is a self-confident JS library for creating reactive DOM. It is inspired by React and Preact, but offers its own signal-based approach.
+PreffX is a self-confident JS library for creating reactive DOM. It is inspired by React, Preact and SolidJS, but offers its own signal-based approach.
 
 ⚠️ The project is in an experimental stage, do not use in a production environment ⚠️
 
@@ -32,7 +32,7 @@ PreffX is a self-confident JS library for creating reactive DOM. It is inspired 
 
 ## Links
 
--   [Docs (in development)](https://effnd.tech/preffx/)
+-   [Docs](https://effnd.tech/preffx/)
 -   [SourceCraft](https://sourcecraft.dev/msabitov/preffx)
 -   [GitHub](https://github.com/msabitov/preffx)
 -   [NPM](https://www.npmjs.com/package/preffx)
