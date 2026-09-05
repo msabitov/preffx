@@ -1,4 +1,4 @@
-import type { PC, APC, PreffXRootParams, RootScope, PreffXMountConfig } from './types';
+import type { PC, APC, PreffXRootParams, RootScope, PreffXMountConfig, Navigate } from './types';
 import { h, Fragment } from './h';
 import { childrenEffects } from './reactive/children';
 import { destroy, mount, PREFFX_PRELOAD_ATTR } from './utils/core';
@@ -6,6 +6,8 @@ import { signal as preactSignal, computed as preactComputed } from '@preact/sign
 import { Renderer } from './utils/render';
 
 export type { PC, APC };
+
+export type { JSX } from './jsx';
 
 /**
  * Fragment component
@@ -101,7 +103,7 @@ export function createRoot(params?: Omit<PreffXRootParams, 'utils'>) {
 
     const rootUtils = {
         lang: readonlyLang, setLang,
-        url: readonlyUrl, navigate: navigate as unknown as Navigation['navigate']
+        url: readonlyUrl, navigate: navigate as unknown as Navigate
     };
 
     // root-specific utils (lang, url, navigate) and user-provided context,

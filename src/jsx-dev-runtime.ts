@@ -1,7 +1,10 @@
-import './types';
+import type { JSX } from './jsx';
 import { h, Fragment } from './h';
 
-function jsx(type: any, props: any) {
+export type { JSX };
+export type { JSX as JSXInternal };
+
+function jsx(type: string | Function, props: any): any {
   return h(type, props);
 }
 
