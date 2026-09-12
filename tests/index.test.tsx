@@ -1318,3 +1318,259 @@ describe('Hydrate existing DOM', () => {
     });
 });
 
+describe('Attribute handling for JSX nodes', () => {
+    let rootElement: HTMLDivElement;
+
+    beforeAll(() => {
+        rootElement = globalThis.document.createElement('div');
+        rootElement.id = 'attr-app';
+        globalThis.document.body.appendChild(rootElement);
+        return () => { rootElement.remove(); };
+    });
+
+    // Switch an attribute value through a signal by clicking a button.
+    const ToggleAttr: PC<{ attr: string; initial: any; next: any }> = (
+        { attr, initial, next }, { signal },
+    ) => {
+        const s = signal(initial);
+        return h('div', {
+            [attr]: s,
+            children: [h('button', {
+                id: 'set',
+                onClick: () => { s.value = next; },
+                children: ['set'],
+            })],
+        });
+    };
+
+    test('boolean true -> false removes a flag attribute', async () => {
+        const root = createRoot();
+        root.mount(ToggleAttr, { node: rootElement, props: {
+            attr: 'data-active', initial: true, next: false,
+        } });
+        await tick();
+
+        const el = rootElement.firstElementChild as HTMLElement;
+        expect(el.hasAttribute('data-active')).toBe(true);
+        expect(el.getAttribute('data-active')).toBe('');
+
+        (rootElement.querySelector('#set') as HTMLButtonElement).click();
+        await tick();
+        expect(el.hasAttribute('data-active')).toBe(false);
+        root.destroy();
+    });
+
+    test('class={false} removes the class attribute', async () => {
+        const root = createRoot();
+        root.mount(ToggleAttr, { node: rootElement, props: {
+            attr: 'class', initial: 'visible', next: false,
+        } });
+        await tick();
+
+        let el = rootElement.firstElementChild as HTMLElement;
+        expect(el.getAttribute('class')).toBe('visible');
+
+        (rootElement.querySelector('#set') as HTMLButtonElement).click();
+        await tick();
+        el = rootElement.firstElementChild as HTMLElement;
+        expect(el.hasAttribute('class')).toBe(false);
+        root.destroy();
+    });
+
+    test('class={""} removes the class attribute', async () => {
+        const root = createRoot();
+        root.mount(ToggleAttr, { node: rootElement, props: {
+            attr: 'class', initial: 'visible', next: '',
+        } });
+        await tick();
+        (rootElement.querySelector('#set') as HTMLButtonElement).click();
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).hasAttribute('class')).toBe(false);
+        root.destroy();
+    });
+
+    test('style={false} removes the style attribute', async () => {
+        const root = createRoot();
+        root.mount(ToggleAttr, { node: rootElement, props: {
+            attr: 'style', initial: 'color:red', next: false,
+        } });
+        await tick();
+        (rootElement.querySelector('#set') as HTMLButtonElement).click();
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).hasAttribute('style')).toBe(false);
+        root.destroy();
+    });
+
+    test('style as a string signal renders correctly', async () => {
+        const root = createRoot();
+        root.mount(ToggleAttr, { node: rootElement, props: {
+            attr: 'style', initial: 'color:blue', next: 'color:green',
+        } });
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).getAttribute('style')).toBe('color:blue');
+        (rootElement.querySelector('#set') as HTMLButtonElement).click();
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).getAttribute('style')).toBe('color:green');
+        root.destroy();
+    });
+
+    test('CSS 0 is kept in an object style (margin/opacity)', async () => {
+        const C: PC = () => h('div', { style: { margin: 0, opacity: '1' }, children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        const el = rootElement.firstElementChild as HTMLElement;
+        expect(el.getAttribute('style')).toContain('margin:0');
+        expect(el.getAttribute('style')).toContain('opacity:1');
+        root.destroy();
+    });
+
+    test('numeric 0 is a valid value for a regular attribute (tabindex)', async () => {
+        const C: PC = () => h('div', { tabindex: 0, children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        const el = rootElement.firstElementChild as HTMLElement;
+        expect(el.hasAttribute('tabindex')).toBe(true);
+        expect(el.getAttribute('tabindex')).toBe('0');
+        root.destroy();
+    });
+
+    test('NaN removes the attribute', async () => {
+        const root = createRoot();
+        root.mount(ToggleAttr, { node: rootElement, props: {
+            attr: 'data-state', initial: 'visible', next: NaN,
+        } });
+        await tick();
+        (rootElement.querySelector('#set') as HTMLButtonElement).click();
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).hasAttribute('data-state')).toBe(false);
+        root.destroy();
+    });
+
+    test('plain string attribute is set', async () => {
+        const C: PC = () => h('div', { 'data-x': 'hello', children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).getAttribute('data-x')).toBe('hello');
+        root.destroy();
+    });
+
+    test('camelCase attribute name becomes kebab-case', async () => {
+        const C: PC = () => h('div', { 'dataMyFlag': '1', children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        const el = rootElement.firstElementChild as HTMLElement;
+        expect(el.hasAttribute('data-my-flag')).toBe(true);
+        root.destroy();
+    });
+
+    test('falsy regular attributes (false/null/undefined/""/NaN) are removed', async () => {
+        const C: PC = () =>
+            h('div', { a: false, b: null, c: undefined, d: '', e: NaN, children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        const el = rootElement.firstElementChild as HTMLElement;
+        expect(el.hasAttribute('a')).toBe(false);
+        expect(el.hasAttribute('b')).toBe(false);
+        expect(el.hasAttribute('c')).toBe(false);
+        expect(el.hasAttribute('d')).toBe(false);
+        expect(el.hasAttribute('e')).toBe(false);
+        root.destroy();
+    });
+
+    test('class as an array joins truthy entries', async () => {
+        const C: PC = () => h('div', { class: ['a', '', 'b', false, 0, 'c'], children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).getAttribute('class')).toBe('a b c');
+        root.destroy();
+    });
+
+    test('class as an object keeps only truthy keys', async () => {
+        const C: PC = () => h('div', {
+            class: { enabled: true, disabled: false, active: 'yes', muted: null },
+            children: [],
+        });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).getAttribute('class')).toBe(' enabled active');
+        root.destroy();
+    });
+
+    test('style object is stringified with kebab-case and empty values skipped', async () => {
+        const C: PC = () =>
+            h('div', { style: { backgroundColor: 'red', margin: 0, display: null, opacity: false }, children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        const style = (rootElement.firstElementChild as HTMLElement).getAttribute('style')
+        expect(style).toContain('background-color:red;');
+        expect(style).toContain('margin:0;');
+        expect(style).not.toContain('display');
+        expect(style).not.toContain('opacity');
+        root.destroy();
+    });
+
+    test('unset class/style (undefined) is left untouched', async () => {
+        const C: PC = () => h('div', { children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        const el = rootElement.firstElementChild as HTMLElement;
+        expect(el.hasAttribute('class')).toBe(false);
+        expect(el.hasAttribute('style')).toBe(false);
+        root.destroy();
+    });
+
+    test('on handler as a function is invoked', async () => {
+        let called = 0;
+        const C: PC = () => h('button', {
+            id: 'evt-fn',
+            onClick: () => { called++; },
+            children: ['x'],
+        });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        (rootElement.querySelector('#evt-fn') as HTMLButtonElement).click();
+        expect(called).toBe(1);
+        root.destroy();
+    });
+
+    test('on handler as an object applies modifiers (prevent)', async () => {
+        let called = 0;
+        let prevented = false;
+        const C: PC = () => h('button', {
+            id: 'evt-obj',
+            onClick: {
+                handler: (e: Event) => { called++; prevented = e.defaultPrevented; },
+                prevent: true,
+            },
+            children: ['x'],
+        });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        const btn = rootElement.querySelector('#evt-obj') as HTMLButtonElement;
+        btn.dispatchEvent(new Event('click', { cancelable: true }));
+        expect(called).toBe(1);
+        expect(prevented).toBe(true);
+        root.destroy();
+    });
+
+    test('$property sets a DOM property directly', async () => {
+        const C: PC = () => h('div', { $title: 'hello', children: [] });
+        const root = createRoot();
+        root.mount(C, { node: rootElement });
+        await tick();
+        expect((rootElement.firstElementChild as HTMLElement).title).toBe('hello');
+        root.destroy();
+    });
+});
+

@@ -12,7 +12,10 @@ const resolveRef = (ref: Signal | ((node: Node | null) => void), value: Node | n
 };
 const kebabCase = (str: string): string => str.replace(/[A-Z]/g, (v) => '-' + v.toLowerCase());
 const propVal = (prop: string, val: any) => `${kebabCase(prop)}:${'' + val};`
-const stringify = (obj: object): string => Object.entries(obj).reduce((acc, item) => acc + (item[1] ? propVal(item[0], item[1]) : ''), '');
+const isEmptyValue = (arg: any): boolean =>
+    arg === false || arg === null || arg === undefined || arg === '' ||
+    (typeof arg === 'number' && Number.isNaN(arg));
+const stringify = (obj: object): string => Object.entries(obj).reduce((acc, item) => acc + (isEmptyValue(item[1]) ? '' : propVal(item[0], item[1])), '');
 const isDefined = (arg: any) => arg !== null && arg !== undefined;
 
 // node reactive model
@@ -69,10 +72,13 @@ const NodeModel = createModel<any, any>(({
             const attr = kebabCase(key);
             effect(() => {
                 const nextValue = resolveValue(val);
-                if (isDefined(nextValue)) {
-                    if (typeof nextValue === 'boolean') node.setAttribute(attr, '');
-                    else node.setAttribute(attr, nextValue);
-                } else node.removeAttribute(attr);
+                if (isEmptyValue(nextValue)) {
+                    node.removeAttribute(attr);
+                } else if (typeof nextValue === 'boolean') {
+                    node.setAttribute(attr, '');
+                } else {
+                    node.setAttribute(attr, '' + nextValue);
+                }
             });
         }
     });
@@ -80,21 +86,30 @@ const NodeModel = createModel<any, any>(({
     if (isDefined(className)) {
         effect(() => {
             const nextValue = resolveValue(className);
+            // unified falsy rule: empty values remove the class attribute
+            if (isEmptyValue(nextValue)) {
+                node.removeAttribute('class');
+                return;
+            }
             const strValue = Array.isArray(nextValue) ?
                 nextValue.filter(Boolean).join(' ') :
                 typeof nextValue === 'object' ? Object.entries(nextValue).reduce((acc, [k, v]) => acc + (v ? ' ' + k : ''), '') :
-                nextValue;
-            if (isDefined(strValue)) node.setAttribute('class', strValue + '');
-            else node.removeAttribute('class');
+                '' + nextValue;
+            node.setAttribute('class', strValue);
         });
     }
     // style
     if (style) {
         effect(() => {
             const nextValue = resolveValue(style);
-            const strValue = style && (typeof style === 'object') ? stringify(nextValue) : nextValue;
-            if (strValue) node.setAttribute('style', strValue + '');
-            else node.removeAttribute('style');
+            if (isEmptyValue(nextValue)) {
+                node.removeAttribute('style');
+                return;
+            }
+            const strValue = (typeof nextValue === 'object' && nextValue)
+                ? stringify(nextValue)
+                : '' + nextValue;
+            node.setAttribute('style', strValue);
         });
     }
 

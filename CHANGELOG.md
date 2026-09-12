@@ -5,7 +5,20 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.2] - 2026-09-04
+## [0.7.3] - 2026-09-12
+
+### Added
+- added tests for attribute handling of JSX nodes
+- coverage config added
+
+### Fixed
+- fixed bug with handling boolean JSX attribute values
+- fixed bug with handling object value of style attribute
+
+### Changed
+- README badges
+
+## [0.7.2] - 2026-09-05
 
 ### Added
 - `jsx-runtime` and `jsx-dev-runtime` modules now export the `JSX` namespace and the `JSXInternal` type alias
@@ -156,7 +169,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.7.2]: https://github.com/msabitov/preffx
+[0.7.3]: https://github.com/msabitov/preffx
+[0.7.2]: https://github.com/msabitov/preffx/commit/ceb817e39b933038b195c4d5e99da82e66020c78
 [0.7.1]: https://github.com/msabitov/preffx/commit/7e1c28ae7fa85dd2d809c37fc2735f6ea607f1cb
 [0.7.0]: https://github.com/msabitov/preffx/commit/2bde4f6e2c81fedcd1d7396c93da81c21916dba4
 [0.6.2]: https://github.com/msabitov/preffx/commit/c7b61d21c20e70798a6505078d444c0010d488b2

@@ -41,5 +41,15 @@ export default defineConfig({
                 ...jsxConfig
             }
         ],
+        coverage: {
+            provider: 'v8',
+            reporter: ['html', 'text', 'json', 'lcov'],
+            thresholds: {
+                lines: 80,
+                branches: 70,
+                functions: 80,
+                statements: 80
+            }
+        }
     },
 });

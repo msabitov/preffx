@@ -1,6 +1,6 @@
 {
     "name": "preffx",
-    "version": "0.7.2",
+    "version": "0.7.3",
     "description": "Self-confident DOM reactivity",
     "author": "Marat Sabitov",
     "license": "Apache-2.0",
@@ -9,7 +9,9 @@
         "build": "rollup -c",
         "test": "vitest",
         "test:node": "vitest --project node",
-        "test:node:run": "vitest run --project node"
+        "test:node:run": "vitest run --project node",
+        "coverage": "vitest run --coverage",
+        "coverage:submit": "vitest run --coverage && coveralls < ./coverage/lcov.info"
     },
     "keywords": [
         "preffx",
@@ -49,6 +51,8 @@
         "@rollup/plugin-terser": "^1.0.0",
         "@rollup/plugin-typescript": "^12.3.0",
         "@vitest/browser-playwright": "^4.1.8",
+        "@vitest/coverage-v8": "^4.1.11",
+        "coveralls": "^3.1.1",
         "rollup": "^4.59.0",
         "rollup-plugin-cleaner": "^1.0.0",
         "tslib": "^2.8.1",
