@@ -127,8 +127,12 @@ const ChildrenModel = createModel<any, any>(({root, children}) => {
 
     effect(() => {
         return () => {
+            const cachePeek = cache.peek();
+            for (const [_, val] of cachePeek) {
+                destroy(val);
+            }
             // clear cache
-            cache.peek().clear();
+            cachePeek.clear();
             // clear mutations
             mutations.clear();
         }

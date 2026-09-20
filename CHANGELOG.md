@@ -5,6 +5,13 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.4] - 2026-09-20
+
+### Fixed
+- fixed Vitest coverage config
+- manual signal disposal within the component has been removed, as the reactive model from `@preact/signals-core` handles this automatically
+- fixed a bug causing double destroy of reactive children: `destroy()` is now idempotent (a torn-down value is skipped on subsequent calls), since reactive children are reachable through both the DOM teardown cascade and the `ChildrenModel` cache cleanup (tests added)
+
 ## [0.7.3] - 2026-09-12
 
 ### Added

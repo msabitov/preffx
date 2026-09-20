@@ -8,6 +8,7 @@ export type TPreffXItem = {
 // symbols
 const mountSymbol = Symbol('PreffX.mount');
 const destroySymbol = Symbol('PreffX.destroy');
+const destroyedSymbol = Symbol('PreffX.destroyed');
 export const SIGNAL_MARKER = Symbol('preffx-signal-marker');
 // per-root preload script attribute: `<script data-preffx-preload="<root prefix>">`
 export const PREFFX_PRELOAD_ATTR = 'data-preffx-preload';
@@ -45,5 +46,9 @@ export const mount = (arg: any) => {
 export const destroy = (arg: any) => {
     if (isSignal(arg)) destroy(arg.value);
     else if (isArray(arg)) arg.forEach(destroy);
-    arg && arg[destroySymbol] && arg[destroySymbol]();
+    if (!arg || arg[destroyedSymbol]) return;
+    if (arg[destroySymbol]) {
+        arg[destroyedSymbol] = true;
+        arg[destroySymbol]();
+    }
 };

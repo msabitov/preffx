@@ -119,7 +119,10 @@ const For: PC<{
         const removedItemsSet = prevItemsSet.difference(currentItemsSet);
 
         removedItemsSet.values().forEach((item) => {
-            cache.peek().delete(item);
+            const cachePeek = cache.peek();
+            const val = cachePeek.get(item);
+            if (val) destroy(val);
+            cachePeek.delete(item);
         });
 
         // items changed
@@ -280,15 +283,12 @@ export function component({
     const signal = <T>(arg: T, options?: SignalOptions<T>): Signal<T> => {
         const rawSignal = preactSignal(arg, options) as SignalWithPrev;
 
-        const dispose = preactEffect(() => {
+        preactEffect(() => {
             const value = rawSignal.value;
             return () => {
                 rawSignal.prev = value;
+                destroy(rawSignal.prev);
             }
-        });
-
-        onDestroyCallback(rawSignal, () => {
-            dispose();
         });
 
         return rawSignal;
@@ -309,15 +309,12 @@ export function component({
             });
         }, options)  as SignalWithPrev;
 
-        const dispose = preactEffect(() => {
+        preactEffect(() => {
             const value = rawSignal.value;
             return () => {
                 rawSignal.prev = value;
+                destroy(rawSignal.prev);
             }
-        });
-
-        onDestroyCallback(rawSignal, () => {
-            dispose();
         });
         return rawSignal;
     };
@@ -402,14 +399,12 @@ export function component({
     const readonlyUrl = scope.utils.url;
     const navigate = scope.utils.navigate;
 
-    const dictDisposers: Function[] = [];
-
     const dict = <T extends object>(
         resolvers: Record<string, () => (T | Promise<T>)>,
         initial?: T
     ): DictProxy<T> => {
         const dictSignal = preactSignal(initial ?? ({} as T));
-        const dispose = preactEffect(() => {
+        preactEffect(() => {
             const langValue = readonlyLang.value;
             const resolver = resolvers[langValue] || resolvers['*'];
             if (!resolver) {
@@ -429,7 +424,6 @@ export function component({
             });
             return () => { cancelled = true; };
         });
-        dictDisposers.push(dispose);
 
         // Per-field computed cache (for non-function access)
         const fieldCache = new Map<string, ReadonlySignal<any>>();
@@ -517,7 +511,6 @@ export function component({
     });
     onDestroyCallback(componentRoot, () => {
         callbacks.destroy.forEach((fn) => fn());
-        dictDisposers.forEach((fn) => fn());
         componentModel[Symbol.dispose]();
     });
 

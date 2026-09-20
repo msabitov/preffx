@@ -43,6 +43,7 @@ export default defineConfig({
         ],
         coverage: {
             provider: 'v8',
+            include: ['src/**'],
             reporter: ['html', 'text', 'json', 'lcov'],
             thresholds: {
                 lines: 80,

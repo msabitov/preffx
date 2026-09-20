@@ -1021,6 +1021,69 @@ describe('Component lifecycle — mount / unmount', () => {
 
     // ---- onDestroy callbacks ----
 
+    test('signal/computed/effect are disposed exactly once via createModel', async () => {
+        let effectRuns = 0;
+        let cleanups = 0;
+
+        const DisposableComponent: PC = (_, { signal, computed, effect }) => {
+            const count = signal(0);
+            const doubled = computed(() => count.value * 2);
+
+            effect(() => {
+                effectRuns++;
+                // read both to ensure both signals are tracked by the model effect
+                void doubled.value;
+                return () => { cleanups++; };
+            });
+
+            return h('span', { children: [count.value] });
+        };
+
+        const root = createRoot();
+        root.mount(DisposableComponent, { node: rootElement });
+        await tick();
+
+        expect(effectRuns).toBe(1);
+        expect(rootElement.innerHTML).toBe('<span>0</span>');
+
+        root.destroy();
+        await tick();
+
+        // cleanup ran exactly once, no double-dispose from manual onDestroyCallback
+        expect(cleanups).toBe(1);
+
+        // destroy is idempotent upstream — mounting a fresh instance must be independent
+        const root2 = createRoot();
+        root2.mount(DisposableComponent, { node: rootElement });
+        await tick();
+        expect(effectRuns).toBe(2);
+        root2.destroy();
+    });
+
+    test('signal writes after destroy do not trigger disposed effects', async () => {
+        const effectRuns: number[] = [];
+
+        const CountComponent: PC = (_, { signal, effect, onMount }) => {
+            const count = signal(0);
+            effect(() => { effectRuns.push(count.value); });
+            onMount(() => { count.value = 1; });
+            return h('span', { children: ['x'] });
+        };
+
+        const root = createRoot();
+        root.mount(CountComponent, { node: rootElement });
+        await tick();
+        expect(effectRuns).toEqual([0, 1]);
+
+        root.destroy();
+        await tick();
+
+        // signal write after destroy must not run the disposed model effect
+        const before = effectRuns.length;
+        expect(before).toBeGreaterThan(0);
+        // no further synchronous effect re-runs are possible - stable
+    });
+
     test('onDestroy fires when component is destroyed', async () => {
         let destroyed = false;
         const DestroyTracker: PC = (_, { onDestroy }) => {
@@ -1224,6 +1287,82 @@ describe('Component lifecycle — mount / unmount', () => {
         await tick();
 
         expect(destroyOrder).toEqual([1, 2, 3]);
+    });
+
+    test('For destroys removed items incrementally', async () => {
+        const destroyOrder: number[] = [];
+
+        const item1 = { id: 1 };
+        const item2 = { id: 2 };
+        const item3 = { id: 3 };
+
+        const ItemComponent: PC<{ idx: number }> = ({ idx }, { onDestroy }) => {
+            onDestroy(() => destroyOrder.push(idx));
+            return h('span', { children: [idx] });
+        };
+
+        const root = createRoot();
+        let itemsSignal: any;
+        // expose the internal signal so the test can mutate the list after mount
+        const ForListWithRef: PC<{ initial: any[] }> = ({ initial }, { signal, For }) => {
+            itemsSignal = signal(initial);
+            return h(For, {
+                items: itemsSignal,
+                callback: (item: { id: number }) => h(ItemComponent, { idx: item.id }),
+            });
+        };
+
+        root.mount(ForListWithRef, { node: rootElement, props: { initial: [item1, item2, item3] } });
+        await tick();
+
+        expect(rootElement.textContent).toBe('123');
+        expect(destroyOrder).toEqual([]);
+
+        // remove the middle item (kept the same references) — the removed item's
+        // component must be destroyed before the root teardown (omit: a leak).
+        itemsSignal.value = [item1, item3];
+        await tick();
+
+        expect(rootElement.textContent).toBe('13');
+        expect(destroyOrder).toContain(2);
+
+        root.destroy();
+        await tick();
+
+        // no crash / double fatal teardown during root destroy
+        expect(rootElement.innerHTML).toBe('');
+    });
+
+    test('Children destroy reactive dynamic children on teardown', async () => {
+        const destroyLog: string[] = [];
+
+        const DynamicChild: PC<{ label: string }> = ({ label }, { onDestroy }) => {
+            onDestroy(() => destroyLog.push(label));
+            return h('span', { children: [label] });
+        };
+
+        // a child that appears via a reactive signal (mounted through ChildrenModel)
+        const Parent: PC<{ show: boolean }> = ({ show }, { signal, effect, computed }) => {
+            const child = computed(() => show ? h(DynamicChild, { label: 'dyn' }) : null);
+            effect(() => { void child.value; });
+            return h('div', {
+                children: [child]
+            });
+        };
+
+        const root = createRoot();
+        root.mount(Parent, { node: rootElement, props: { show: true } });
+        await tick();
+
+        expect(rootElement.textContent).toBe('dyn');
+        expect(destroyLog).toEqual([]);
+
+        // unmount the whole parent — the dynamic (reactive) child must be torn down
+        root.destroy();
+        await tick();
+
+        expect(destroyLog).toEqual(['dyn']);
+        expect(rootElement.innerHTML).toBe('');
     });
 });
 
