@@ -9,12 +9,11 @@ export type TPreffXItem = {
 const mountSymbol = Symbol('PreffX.mount');
 const destroySymbol = Symbol('PreffX.destroy');
 const destroyedSymbol = Symbol('PreffX.destroyed');
-export const SIGNAL_MARKER = Symbol('preffx-signal-marker');
 // per-root preload script attribute: `<script data-preffx-preload="<root prefix>">`
 export const PREFFX_PRELOAD_ATTR = 'data-preffx-preload';
 // base utils
 export const isArray = (val: any) => Array.isArray(val);
-export const isSignal = (val: any) => val instanceof Signal || val?.[SIGNAL_MARKER];
+export const isSignal = (val: any) => val instanceof Signal;
 export const isNode = (val: any) => val instanceof Node;
 export const isPromise = (fn: any) => fn && fn.then && typeof fn.then === 'function' && fn.catch && typeof fn.catch === 'function';
 export const resolveValue = (arg: any): any => isSignal(arg) ? arg.value : arg;

@@ -13,7 +13,6 @@ import {
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
     isPromise, resolveDeepRawValue, resolveValue, TPreffXItem,
-    SIGNAL_MARKER,
 } from '../utils/core';
 import { matchPath } from '../utils/routing';
 import { childrenEffects } from './children';
@@ -430,25 +429,16 @@ export function component({
         return new Proxy({} as DictProxy<T>, {
             get(_, key) {
                 if (typeof key !== 'string') return Reflect.get(_, key);
-                // Create a callable wrapper: when invoked with args,
-                // creates a computed that calls the dictionary function field.
-                const wrapper = (...args: any[]) =>
-                    preactComputed(() => (dictSignal.value as any)[key](...args));
-                // .value getter — creates cached computed for non-function access
-                Object.defineProperty(wrapper, 'value', {
-                    get: () => {
-                        if (!fieldCache.has(key)) {
-                            fieldCache.set(key, preactComputed(() => (dictSignal.value as any)[key]));
-                        }
-                        return fieldCache.get(key)!.value;
-                    },
-                    enumerable: true,
-                });
-                // .peek() — returns current field value without tracking
-                wrapper.peek = () => (dictSignal.peek() as any)[key];
-                // Signal marker so isSignal() recognizes this as a signal
-                wrapper[SIGNAL_MARKER] = true;
-                return wrapper;
+                const field = () => (dictSignal.value as any)[key];
+                // functional field
+                if (typeof (dictSignal.peek() as any)[key] === 'function') {
+                    return (...args: any[]) => preactComputed(() => field()(...args));
+                }
+                // scalar field
+                if (!fieldCache.has(key)) {
+                    fieldCache.set(key, preactComputed(field));
+                }
+                return fieldCache.get(key)!;
             },
         });
     };

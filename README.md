@@ -12,7 +12,7 @@
 [![npm latest package](https://badgen.net/npm/v/preffx)](https://www.npmjs.com/package/preffx)
 ![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/preffx?cacheSeconds=0)
 ![install size](https://badgen.net/packagephobia/install/preffx)
-[![Coverage Status](https://coveralls.io/repos/github/msabitov/preffx/badge.svg?branch=master)](https://coveralls.io/github/msabitov/preffx?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/msabitov/preffx/badge.svg?branch=main)](https://coveralls.io/github/msabitov/preffx?branch=main)
 
 </div>
 

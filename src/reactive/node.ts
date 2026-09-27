@@ -18,6 +18,46 @@ const isEmptyValue = (arg: any): boolean =>
 const stringify = (obj: object): string => Object.entries(obj).reduce((acc, item) => acc + (isEmptyValue(item[1]) ? '' : propVal(item[0], item[1])), '');
 const isDefined = (arg: any) => arg !== null && arg !== undefined;
 
+const createListener = (value: any) => {
+    let fn: Function;
+    let listenerOptions: Partial<Record<'stop' | 'prevent' | 'once' | 'capture' | 'passive', boolean>>;
+    if (typeof value === 'object') {
+        const {handler, ...mods} = value;
+        listenerOptions = mods;
+        fn = handler;
+    } else {
+        fn = value;
+        listenerOptions = {
+            once: false,
+            passive: false,
+            capture: false,
+            prevent: false,
+            stop: false
+        };
+    }
+    return {
+        listener: (e: Event) => {
+            if (listenerOptions.prevent) e.preventDefault?.();
+            if (listenerOptions.stop) e.stopPropagation?.();
+            fn(e);
+        },
+        options: listenerOptions
+    };  
+};
+
+const stringifyClassName = (nextValue: any) => {
+    return Array.isArray(nextValue) ?
+        nextValue.filter(Boolean).join(' ') :
+            typeof nextValue === 'object' ? Object.entries(nextValue).reduce((acc, [k, v]) => acc + (v ? ' ' + k : ''), '') :
+            '' + nextValue;
+};
+
+const stringifyStyle = (nextValue: any) => {
+    return (typeof nextValue === 'object' && nextValue)
+        ? stringify(nextValue)
+        : '' + nextValue;
+};
+
 // node reactive model
 const NodeModel = createModel<any, any>(({
     node, props
@@ -27,91 +67,102 @@ const NodeModel = createModel<any, any>(({
         class: className,
         ...restProps
     } = props;
+
+    const unsubscribeArray: Function[] = [];
     // props effect
     Object.entries(restProps).forEach(([key, val]) => {
         // event listeners
         if (key.startsWith('on')) {
             const event = key.slice(2).toLowerCase();
-            effect(() => {
-                const nextValue = resolveValue(val);
-                let nextHandler: Function;
-                let listenerOptions: Partial<Record<'stop' | 'prevent' | 'once' | 'capture' | 'passive', boolean>>;
-                if (typeof nextValue === 'object') {
-                    const {handler, ...mods} = nextValue;
-                    listenerOptions = mods;
-                    nextHandler = handler;
-                } else {
-                    nextHandler = nextValue;
-                    listenerOptions = {
-                        once: false,
-                        passive: false,
-                        capture: false,
-                        prevent: false,
-                        stop: false
+            if (isSignal(val)) {
+                effect(() => {
+                    const { listener, options } = createListener(val.value);
+                    (node as HTMLElement).addEventListener(event, listener, options);
+                    return () => {
+                        node.removeEventListener(event, listener, options);
                     };
-                }
-                const listener = (e: Event) => {
-                    if (listenerOptions.prevent) e.preventDefault?.();
-                    if (listenerOptions.stop) e.stopPropagation?.();
-                    nextHandler(e);
-                };
-                (node as HTMLElement).addEventListener(event, listener, listenerOptions);
-                return () => {
-                    node.removeEventListener(event, listener, listenerOptions);
-                };
-            });
+                });
+            } else {
+                const { listener, options } = createListener(val);
+                (node as HTMLElement).addEventListener(event, listener, options);
+                unsubscribeArray.push(() => {
+                    node.removeEventListener(event, listener, options);
+                });
+            }
         // properties
         } else if (key.startsWith('$')) {
             const prop = key.slice(1);
-            effect(() => {
-                let nextResolved = resolveValue(val);
-                node[prop] = nextResolved;
-            });
+            if (isSignal(val)) {
+                effect(() => {
+                    let nextResolved = val.value;
+                    node[prop] = nextResolved;
+                });
+            } else {
+                node[prop] = val;
+            }
         // attributes
         } else {
             const attr = kebabCase(key);
-            effect(() => {
-                const nextValue = resolveValue(val);
-                if (isEmptyValue(nextValue)) {
-                    node.removeAttribute(attr);
-                } else if (typeof nextValue === 'boolean') {
+            if (isSignal(val)) {
+                effect(() => {
+                    const nextValue = val.value;
+                    if (isEmptyValue(nextValue)) {
+                        node.removeAttribute(attr);
+                    } else if (typeof nextValue === 'boolean') {
+                        node.setAttribute(attr, '');
+                    } else {
+                        node.setAttribute(attr, '' + nextValue);
+                    }
+                });
+            } else if (!isEmptyValue(val)) {
+                if (typeof val === 'boolean') {
                     node.setAttribute(attr, '');
                 } else {
-                    node.setAttribute(attr, '' + nextValue);
+                    node.setAttribute(attr, '' + val);
                 }
-            });
+            }
         }
     });
     // className
     if (isDefined(className)) {
-        effect(() => {
-            const nextValue = resolveValue(className);
-            // unified falsy rule: empty values remove the class attribute
-            if (isEmptyValue(nextValue)) {
-                node.removeAttribute('class');
-                return;
-            }
-            const strValue = Array.isArray(nextValue) ?
-                nextValue.filter(Boolean).join(' ') :
-                typeof nextValue === 'object' ? Object.entries(nextValue).reduce((acc, [k, v]) => acc + (v ? ' ' + k : ''), '') :
-                '' + nextValue;
+        if (isSignal(className)) {
+            effect(() => {
+                const nextValue = resolveValue(className);
+                // unified falsy rule: empty values remove the class attribute
+                if (isEmptyValue(nextValue)) {
+                    node.removeAttribute('class');
+                    return;
+                }
+                const strValue = stringifyClassName(nextValue);
+                node.setAttribute('class', strValue);
+            });
+        } else if (!isEmptyValue(className)) {
+            const strValue = stringifyClassName(className);
             node.setAttribute('class', strValue);
-        });
+        }
     }
     // style
     if (style) {
-        effect(() => {
-            const nextValue = resolveValue(style);
-            if (isEmptyValue(nextValue)) {
-                node.removeAttribute('style');
-                return;
-            }
-            const strValue = (typeof nextValue === 'object' && nextValue)
-                ? stringify(nextValue)
-                : '' + nextValue;
+        if (isSignal(style)) {
+            effect(() => {
+                const nextValue = resolveValue(style);
+                if (isEmptyValue(nextValue)) {
+                    node.removeAttribute('style');
+                    return;
+                }
+                const strValue = stringifyStyle(nextValue);
+                node.setAttribute('style', strValue);
+            });
+        } else if (!isEmptyValue(style)) {
+            const strValue = stringifyStyle(style);
             node.setAttribute('style', strValue);
-        });
+        }
     }
+
+    effect(() => {
+        // remove all static event listeners
+        return () => unsubscribeArray.forEach((fn) => fn());
+    });
 
     return {};
 });

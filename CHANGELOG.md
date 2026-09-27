@@ -5,6 +5,19 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.5] - 2026-09-27
+
+### Added
+- added tests for DOM event listener subscription/unsubscription, covering static listeners and dynamic listeners passed through a signal
+
+### Fixed
+- node props handling fixed: static (non-signal) values for properties, event listeners and attributes are now applied directly instead of being wrapped in an effect; only signal values are reactive
+- README coverage badge fixed
+
+### Changed
+- `@preact/signals-core` dependency bumped to `^1.14.4`
+- dictionary (`dict`) proxy fields are now resolved lazily: functional fields return a callable that creates a computed on invocation, scalar fields return a cached computed
+
 ## [0.7.4] - 2026-09-20
 
 ### Fixed
@@ -176,7 +189,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.7.3]: https://github.com/msabitov/preffx
+[0.7.5]: https://github.com/msabitov/preffx
+[0.7.4]: https://github.com/msabitov/preffx/commit/52c49431d76dbb3d66a6486be2e1d9f0af1aed09
+[0.7.3]: https://github.com/msabitov/preffx/commit/1301266cc82b7321bac8fec8d3825696136f2cb6
 [0.7.2]: https://github.com/msabitov/preffx/commit/ceb817e39b933038b195c4d5e99da82e66020c78
 [0.7.1]: https://github.com/msabitov/preffx/commit/7e1c28ae7fa85dd2d809c37fc2735f6ea607f1cb
 [0.7.0]: https://github.com/msabitov/preffx/commit/2bde4f6e2c81fedcd1d7396c93da81c21916dba4
