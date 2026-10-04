@@ -1,4 +1,4 @@
-import { Signal } from '@preact/signals-core';
+import { Signal } from '../state';
 import { Renderer } from './render';
 
 // types

@@ -1,4 +1,4 @@
-﻿import type { Signal } from '@preact/signals-core';
+﻿import type { Signal } from './state';
 
 /**
  * JSX types for PreffX (module-scoped).

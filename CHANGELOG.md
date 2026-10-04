@@ -5,6 +5,14 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-04
+
+### Added
+- `preffx/state` export that provides all reactive utils from `@preact/signals-core`, as well as `state` and `reduce` (tests added)
+
+### Changed
+- all signals based handlers now use `preffx/state` utils
+
 ## [0.7.5] - 2026-09-27
 
 ### Added
@@ -189,7 +197,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.7.5]: https://github.com/msabitov/preffx
+[0.8.0]: https://github.com/msabitov/preffx
+[0.7.5]: https://github.com/msabitov/preffx/commit/9dba07105ef2622de39e16f574259286c71bac09
 [0.7.4]: https://github.com/msabitov/preffx/commit/52c49431d76dbb3d66a6486be2e1d9f0af1aed09
 [0.7.3]: https://github.com/msabitov/preffx/commit/1301266cc82b7321bac8fec8d3825696136f2cb6
 [0.7.2]: https://github.com/msabitov/preffx/commit/ceb817e39b933038b195c4d5e99da82e66020c78

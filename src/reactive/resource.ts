@@ -1,4 +1,4 @@
-import { batch, Signal, SignalOptions } from '@preact/signals-core';
+import { batch, Signal, SignalOptions } from '../state';
 import { Renderer } from '../utils/render';
 import type { Resource, ResourceState, RootScope } from '../types';
 

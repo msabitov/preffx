@@ -2,7 +2,7 @@ import type { PC, APC, PreffXRootParams, RootScope, PreffXMountConfig, Navigate 
 import { h, Fragment } from './h';
 import { childrenEffects } from './reactive/children';
 import { destroy, mount, PREFFX_PRELOAD_ATTR } from './utils/core';
-import { signal as preactSignal, computed as preactComputed } from '@preact/signals-core';
+import { signal as preactSignal, computed as preactComputed } from './state';
 import { Renderer } from './utils/render';
 
 export type { PC, APC };

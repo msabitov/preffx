@@ -1,6 +1,6 @@
 {
     "name": "preffx",
-    "version": "0.7.5",
+    "version": "0.8.0",
     "description": "Self-confident DOM reactivity",
     "author": "Marat Sabitov",
     "license": "Apache-2.0",
@@ -42,6 +42,10 @@
         "./server": {
             "types": "./dist/types/server/index.d.ts",
             "import": "./dist/server.js"
+        },
+        "./state": {
+            "types": "./dist/types/state.d.ts",
+            "import": "./dist/state.js"
         }
     },
     "dependencies": {

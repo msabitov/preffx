@@ -5,7 +5,7 @@ import type {
     SuspenseBoundary,
     HydrateQueue
 } from '../types';
-import { batch, signal as preactSignal, computed as preactComputed } from '@preact/signals-core';
+import { batch, signal as preactSignal, computed as preactComputed } from '../state';
 
 export const pathSymbol = Symbol('preffx-path');
 export const routeParamsSymbol = Symbol('preffx-route-params');

@@ -1,4 +1,4 @@
-import { batch, createModel, effect, signal } from '@preact/signals-core';
+import { batch, createModel, effect, signal } from '../state';
 import { destroy, mount, isPromise, isSignal, resolveDeepValue, isArray } from '../utils/core';
 import type { SignalWithPrev } from '../types';
 

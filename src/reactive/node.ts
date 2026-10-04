@@ -1,4 +1,4 @@
-import { createModel, effect, Signal } from '@preact/signals-core';
+import { createModel, effect, Signal } from '../state';
 import { mount, destroy, onMountCallback, onDestroyCallback, isSignal, resolveValue, TPreffXItem } from '../utils/core';
 import { childrenEffects } from './children';
 import { Renderer, ssrNode } from '../utils/render';

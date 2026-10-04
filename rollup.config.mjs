@@ -12,6 +12,7 @@ const banner = `/*
 
 const inputs = {
     index: 'src/index.ts',
+    state: 'src/state.ts',
     'jsx-runtime': 'src/jsx-runtime.ts',
     'jsx-dev-runtime': 'src/jsx-dev-runtime.ts',
     server: 'src/server/index.ts'

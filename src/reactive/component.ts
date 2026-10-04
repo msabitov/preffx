@@ -8,8 +8,9 @@ import {
     Signal,
     action,
     SignalOptions,
-    ReadonlySignal
-} from '@preact/signals-core';
+    ReadonlySignal,
+    state, reducer
+} from '../state';
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
     isPromise, resolveDeepRawValue, resolveValue, TPreffXItem,
@@ -331,15 +332,8 @@ export function component({
      */
     const useState = <T>(
         initial: T | (() => T)
-    ): [Signal<T>, (value: T | ((prev: T) => T)) => void] => {
-        const s = signal(initial)
-        const c = computed(() => s.value);
-
-        const set = (value: T | ((prev: T) => T)) => {
-            s.value = typeof value === 'function' ? (value as (prev: T) => T)(s.value as T) : value;
-        };
-
-        return [c, set];
+    ): [ReadonlySignal<T>, (value: T | ((prev: T) => T)) => void] => {
+        return state<T>(initial, { signal, computed });
     };
 
     /**
@@ -350,16 +344,8 @@ export function component({
     const useReducer = <S, A>(
         fn: (state: S, action: A) => S,
         init: S | (() => S)
-    ): [Signal<S>, (action: A) => void] => {
-        const s = signal<S>(typeof init === 'function' ? (init as () => S)() : init);
-        const c = computed(() => s.value);
-        const dispatch = (action: A) => {
-            batch(() => {
-                s.value = fn(s.value, action);
-            });
-        };
-
-        return [c, dispatch];
+    ): [ReadonlySignal<S>, (action: A) => void] => {
+        return reducer<S, A>(fn, init, { signal, computed });
     };
     const routes = (paths: RoutesPaths) => {
         const matchResult = computed(() => {

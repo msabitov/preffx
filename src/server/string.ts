@@ -1,5 +1,5 @@
 import type { PC, APC, RootScope, SSRConfig, RenderToStringResult } from '../types';
-import { computed as preactComputed } from '@preact/signals-core';
+import { computed as preactComputed } from '../state';
 import { h } from '../h';
 import { Renderer } from '../utils/render';
 import { jsxToStatic, serializeData } from './utils';
