@@ -1,5 +1,5 @@
-import { node } from './reactive/node';
-import { component, Fragment } from './reactive/component';
+import { Renderer } from './utils/render';
+import { Fragment } from './utils/component';
 import { isArray } from './utils/core';
 
 /**
@@ -11,10 +11,12 @@ export function h(
 ) {
     const props = rawProps ? {...rawProps} : {};
     if (Object.hasOwn(props, 'children') && !isArray(props.children)) props.children = [props.children];
+    const env = Renderer.getEnv();
+    if (!env) throw new Error('h() must be called within root methods (mount / renderToString)');
     if (typeof type === 'function') {
-        return component({ type, props });
+        return env.component({ type, props });
     }
-    return node({ type, props });
+    return env.node({ type, props });
 }
 
 export { Fragment };

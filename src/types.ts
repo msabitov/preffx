@@ -321,10 +321,32 @@ export type APC<T extends object = object, C extends PreffXContext = PreffXConte
 export type RootUtils = PreffXRootParams['utils'];
 
 /**
+ * PreffX root environment
+ */
+export type Env = {
+    /**
+     * Create a text node
+     */
+    text: (value: any) => any;
+    /**
+     * Create a JSX node
+     */
+    node: (args: { type: string; props: any }) => any;
+    /**
+     * Create a component instance
+     */
+    component: (args: { type: Function; props: any }) => any;
+};
+
+/**
  * Per-root execution scope. Created once per root in `createRoot`,
  * then passed down the tree via `withScope`.
  */
 export type RootScope = {
+    /**
+     * Environment for current root to create node/component from JSX
+     */
+    env?: Env;
     /**
      * Component id prefix, unique per root (e.g. 'fx1')
      */
@@ -354,6 +376,33 @@ export type RootScope = {
      * SSR resource map (only during server rendering)
      */
     resources?: Resources;
+    /**
+     * Client-side hydration state, created lazily by the client `createRoot`
+     * and shared down the tree by reference. Absent on the server.
+     */
+    hydration?: HydrationState;
+};
+
+/**
+ * Per-root client-side hydration bookkeeping (positional DOM matching + preload data).
+ */
+export type HydrationState = {
+    /**
+     * Server-sent hydration data map (per-root preload payload)
+     */
+    data?: Record<string, unknown>;
+    /**
+     * Active hydration session: existing elements in walk order
+     */
+    queue?: Element[];
+    /**
+     * Read cursor into the current hydrate queue
+     */
+    index: number;
+    /**
+     * Per-key hydration subscribers; a map avoids a linear scan
+     */
+    subs: Map<string, Set<() => void>>;
 };
 
 /**

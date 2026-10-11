@@ -1,9 +1,18 @@
-import type { PC, APC, PreffXRootParams, RootScope, PreffXMountConfig, Navigate } from './types';
+// common types
+import type {
+    PC, APC, PreffXRootParams, RootScope, PreffXMountConfig, Navigate
+} from './types';
+// common deps
 import { h, Fragment } from './h';
-import { childrenEffects } from './reactive/children';
-import { destroy, mount, PREFFX_PRELOAD_ATTR } from './utils/core';
 import { signal as preactSignal, computed as preactComputed } from './state';
+import { destroy, mount, PREFFX_PRELOAD_ATTR } from './utils/core';
 import { Renderer } from './utils/render';
+// client deps
+import { childrenEffects } from './client/children';
+import { component } from './client/component';
+import { node as createNode } from './client/node';
+import { createTextNode } from './client/utils';
+import { setHydratedData, withHydrateScope } from './client/hydration';
 
 export type { PC, APC };
 
@@ -161,18 +170,23 @@ export function createRoot(params?: Omit<PreffXRootParams, 'utils'>) {
                     preloadedDataContainer.remove();
                 }
             }
-            if (hydrated) Renderer.setHydratedData(hydrated);
             const scope: RootScope = Renderer.resetScope(rootScope, {...rootContext});
-            Renderer.withRootScope({
-                scope,
-                callback: () => {
-                    children = h(type, props);
-                    clearEffects = childrenEffects({
-                        root, children
-                    });
-                    mount(children);
-                },
-                queue
+            scope.env = { node: createNode, component, text: createTextNode };
+            if (hydrated) {
+                const hydration = scope.hydration ?? (scope.hydration = { index: 0, subs: new Map() });
+                setHydratedData(hydration, hydrated);
+            }
+            withHydrateScope(scope, queue, () => {
+                Renderer.withRootScope({
+                    scope,
+                    callback: () => {
+                        children = h(type, props);
+                        clearEffects = childrenEffects({
+                            root, children
+                        });
+                        mount(children);
+                    }
+                });
             });
         },
         /**

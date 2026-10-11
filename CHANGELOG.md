@@ -5,6 +5,14 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-10-11
+
+### Fixed
+- fixed a bug where directly calling the `h` function did not fully initialize utilities and the component scope; `h` is now valid only within the PreffX root, and calling it outside the root throws an error. The rendering environment (server or client) is now determined by the PreffX root rendering mode
+
+### Changed
+- the code is split into `server` and `client` folders based on the PreffX root rendering mode; this reduces the amount of code loaded in each environment and simplifies future testing
+
 ## [0.8.0] - 2026-10-04
 
 ### Added
@@ -197,7 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.8.0]: https://github.com/msabitov/preffx
+[0.8.1]: https://github.com/msabitov/preffx
+[0.8.0]: https://github.com/msabitov/preffx/commit/7e4337c0031c8e07536c7b20f982b92970b7a3f6
 [0.7.5]: https://github.com/msabitov/preffx/commit/9dba07105ef2622de39e16f574259286c71bac09
 [0.7.4]: https://github.com/msabitov/preffx/commit/52c49431d76dbb3d66a6486be2e1d9f0af1aed09
 [0.7.3]: https://github.com/msabitov/preffx/commit/1301266cc82b7321bac8fec8d3825696136f2cb6

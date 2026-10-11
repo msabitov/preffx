@@ -1,9 +1,11 @@
+// common types
 import type { PC, APC, RootScope, SSRConfig, RenderToStringResult } from '../types';
+// common deps
 import { computed as preactComputed } from '../state';
 import { h } from '../h';
 import { Renderer } from '../utils/render';
+// server deps
 import { jsxToStatic, serializeData } from './utils';
-
 
 /**
  * Server-render a component tree to an HTML string

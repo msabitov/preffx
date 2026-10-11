@@ -30,13 +30,7 @@ export default {
         format: 'es',
         plugins: [terser()],
         entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        manualChunks(id) {
-            // force the SSR-identity-critical modules into a single shared chunk
-            if (/(render|core)\.ts$/.test(id)) {
-                return 'core';
-            }
-        }
+        chunkFileNames: '[name].js'
     },
     plugins: [
         cleaner({ targets: ['./dist/'] }),

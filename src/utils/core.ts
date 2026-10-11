@@ -1,5 +1,4 @@
 import { Signal } from '../state';
-import { Renderer } from './render';
 
 // types
 export type TPreffXItem = {
@@ -14,16 +13,13 @@ export const PREFFX_PRELOAD_ATTR = 'data-preffx-preload';
 // base utils
 export const isArray = (val: any) => Array.isArray(val);
 export const isSignal = (val: any) => val instanceof Signal;
-export const isNode = (val: any) => val instanceof Node;
 export const isPromise = (fn: any) => fn && fn.then && typeof fn.then === 'function' && fn.catch && typeof fn.catch === 'function';
 export const resolveValue = (arg: any): any => isSignal(arg) ? arg.value : arg;
-export const resolveDeepValue = (arg: any): any => {
-    if (Array.isArray(arg)) return arg.map(resolveDeepValue).flat();
-    else if (isSignal(arg)) return resolveDeepValue(arg.value);
-    else if (isNode(arg)) return arg;
-    else if (isPromise(arg) || arg === null || arg === undefined || typeof arg === 'boolean') return Renderer.createTextNode('');
-    else return Renderer.createTextNode(arg);
-};
+export const kebabCase = (str: string): string => str.replace(/[A-Z]/g, (v) => '-' + v.toLowerCase());
+export const escapeHtml = (s: string): string => s
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>');
 
 export const resolveDeepRawValue = (arg: any): any => {
     if (Array.isArray(arg)) return arg.map(resolveDeepRawValue).flat();

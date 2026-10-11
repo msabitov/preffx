@@ -1,6 +1,10 @@
-import { batch, createModel, effect, signal } from '../state';
-import { destroy, mount, isPromise, isSignal, resolveDeepValue, isArray } from '../utils/core';
+// common types
 import type { SignalWithPrev } from '../types';
+// common deps
+import { batch, createModel, effect, signal } from '../state';
+import { destroy, mount, isPromise, isSignal, isArray } from '../utils/core';
+// client deps
+import { resolveDeepValue } from '../client/utils';
 
 // only signal can be a reason to recomputation
 const deepReason = (arg: any): any => isSignal(arg) ? (

@@ -111,13 +111,19 @@ export const CatchComponent: PC<{
 export const PortalComponent: PC<{
     portalRoot: HTMLElement;
     children?: any;
+    text?: string;
+    childId?: string;
 }> = (
-    { portalRoot, children },
+    { portalRoot, children, text, childId },
     { Portal },
 ) => {
+    const content = children ?? h('span', {
+        id: childId,
+        children: [text ?? '']
+    });
     return h(Portal, {
         root: portalRoot,
-        children
+        children: content
     });
 };
 
@@ -493,20 +499,16 @@ describe('Special components', () => {
     });
 
     describe('Fragment', () => {
+        const FragmentWithChildren: PC = () => h(Fragment, {
+            children: [
+                h('p', { children: 'The first paragraph' }),
+                h('p', { children: 'The second paragraph' })
+            ]
+        });
+
         test('With children', async () => {
             const root = createRoot();
-            root.mount(
-                Fragment, { node: rootElement, props: {
-                    children: [
-                        h('p', {
-                            children: 'The first paragraph'
-                        }),
-                        h('p', {
-                            children: 'The second paragraph'
-                        })
-                    ]
-                } }
-            );
+            root.mount(FragmentWithChildren, { node: rootElement });
             await tick();
 
             expect(rootElement.innerHTML).toBe('<p>The first paragraph</p><p>The second paragraph</p>');
@@ -631,7 +633,8 @@ describe('Special components', () => {
         
             root.mount(PortalComponent, { node: rootElement, props: {
                 portalRoot: portalTarget,
-                children: h('span', { id: 'portal-child', children: ['Hello Portal'] })
+                childId: 'portal-child',
+                text: 'Hello Portal'
             } });
             await tick();
         
@@ -652,7 +655,7 @@ describe('Special components', () => {
         
             root.mount(PortalComponent, { node: rootElement, props: {
                 portalRoot: portalTarget,
-                children: h('span', { children: ['Temporary'] })
+                text: 'Temporary'
             } });
             await tick();
             expect(portalTarget.innerHTML).toBe('<span>Temporary</span>');
@@ -715,7 +718,7 @@ describe('Special components', () => {
         
             root.mount(PortalComponent, { node: rootElement, props: {
                 root: null,
-                children: h('span', { children: ['Should not appear'] })
+                text: 'Should not appear'
             } });
             await tick();
         

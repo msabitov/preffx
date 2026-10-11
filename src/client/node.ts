@@ -1,7 +1,128 @@
+// common deps
 import { createModel, effect, Signal } from '../state';
-import { mount, destroy, onMountCallback, onDestroyCallback, isSignal, resolveValue, TPreffXItem } from '../utils/core';
+import {
+    mount, destroy, onMountCallback, onDestroyCallback,
+    isSignal, resolveValue, kebabCase, TPreffXItem
+} from '../utils/core';
+import { Renderer } from '../utils/render';
+// client deps
 import { childrenEffects } from './children';
-import { Renderer, ssrNode } from '../utils/render';
+import { createNode } from './utils';
+import { takeHydrateNode } from './hydration';
+
+const HTML = 'html';
+const SVG = 'svg';
+const MATHML = 'mathml';
+
+const NS = {
+    [HTML]: 'http://www.w3.org/1999/xhtml',
+    [SVG]: 'http://www.w3.org/2000/svg',
+    [MATHML]: 'http://www.w3.org/1998/Math/MathML'
+} as const;
+
+// mapping between tagname and namespace
+const TAG_NS: Record<string, keyof typeof NS> = {
+    // a - html/svg,
+    // image - html/svg,
+    // style, script - html/svg
+    animate: SVG,
+    animateMotion: SVG,
+    animateTransform: SVG,
+    circle: SVG,
+    clipPath: SVG,
+    defs: SVG,
+    desc: SVG,
+    ellipse: SVG,
+    feBlend: SVG,
+    feColorMatrix: SVG,
+    feComponentTransfer: SVG,
+    feComposite: SVG,
+    feConvolveMatrix: SVG,
+    feDiffuseLighting: SVG,
+    feDisplacementMap: SVG,
+    feDistantLight: SVG,
+    feDropShadow: SVG,
+    feFlood: SVG,
+    feFuncA: SVG,
+    feFuncB: SVG,
+    feFuncG: SVG,
+    feFuncR: SVG,
+    feGaussianBlur: SVG,
+    feImage: SVG,
+    feMerge: SVG,
+    feMergeNode: SVG,
+    feMorphology: SVG,
+    feOffset: SVG,
+    fePointLight: SVG,
+    feSpecularLighting: SVG,
+    feSpotLight: SVG,
+    feTile: SVG,
+    feTurbulence: SVG,
+    filter: SVG,
+    foreignObject: SVG,
+    g: SVG,
+    line: SVG,
+    linearGradient: SVG,
+    marker: SVG,
+    mask: SVG,
+    metadata: SVG,
+    mpath: SVG,
+    path: SVG,
+    pattern: SVG,
+    polygon: SVG,
+    polyline: SVG,
+    radialGradient: SVG,
+    rect: SVG,
+    set: SVG,
+    stop: SVG,
+    svg: SVG,
+    switch: SVG,
+    symbol: SVG,
+    text: SVG,
+    textPath: SVG,
+    title: SVG,
+    tspan: SVG,
+    use: SVG,
+    view: SVG,
+    // mathml
+    math: MATHML,
+    annotation: MATHML,
+    'annotation-xml': MATHML,
+    merror: MATHML,
+    mfrac: MATHML,
+    mi: MATHML,
+    mmultiscripts: MATHML,
+    mn: MATHML,
+    mo: MATHML,
+    mover: MATHML,
+    mpadded: MATHML,
+    mphantom: MATHML,
+    mprescripts: MATHML,
+    mroot: MATHML,
+    mrow: MATHML,
+    ms: MATHML,
+    semantics: MATHML,
+    mspace: MATHML,
+    msqrt: MATHML,
+    mstyle: MATHML,
+    msub: MATHML,
+    msup: MATHML,
+    msubsup: MATHML,
+    mtable: MATHML,
+    mtd: MATHML,
+    mtext: MATHML,
+    mtr: MATHML,
+    munder: MATHML,
+    munderover: MATHML
+};
+
+/**
+ * Create an element in the correct namespace (SVG/MathML aware)
+ */
+export const createElement = (ns: keyof typeof NS, name: string, options?: object) => {
+    return createNode(NS[ns || TAG_NS[name] || 'html'], name, options);
+};
+
 
 // utils
 const resolveRef = (ref: Signal | ((node: Node | null) => void), value: Node | null = null) => {
@@ -10,7 +131,6 @@ const resolveRef = (ref: Signal | ((node: Node | null) => void), value: Node | n
         else if (isSignal(ref)) ref.value = value;
     }
 };
-const kebabCase = (str: string): string => str.replace(/[A-Z]/g, (v) => '-' + v.toLowerCase());
 const propVal = (prop: string, val: any) => `${kebabCase(prop)}:${'' + val};`
 const isEmptyValue = (arg: any): boolean =>
     arg === false || arg === null || arg === undefined || arg === '' ||
@@ -177,7 +297,7 @@ const nodeEffects = ({
     return model[Symbol.dispose];
 };
 
-export const node = Renderer.isServerSide() ? ssrNode : ({
+export const node = ({
     type,
     props
 }: {
@@ -195,8 +315,9 @@ export const node = Renderer.isServerSide() ? ssrNode : ({
 
     // during active hydration reuse the existing server-rendered
     // element (positional matching) instead of materialising a fresh one.
-    const hydratedNode = Renderer.isHydrateActive() ? Renderer.takeHydrateNode() : undefined;
-    const node = (hydratedNode || Renderer.createElement($ns, type, props && props.is ? {
+    const hydration = Renderer.getScope()?.hydration;
+    const hydratedNode = !!hydration?.queue ? takeHydrateNode(hydration) : undefined;
+    const node = (hydratedNode || createElement($ns, type, props && props.is ? {
         is: props.is
     } : undefined)) as unknown as (Node & TPreffXItem);
 

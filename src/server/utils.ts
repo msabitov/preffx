@@ -1,8 +1,12 @@
+// common types
 import type { Resources } from '../types';
-import { SSRNode, SuspenseNode, isSuspenseNode, isSSRNode } from '../utils/render';
-import { isSignal, isArray, PREFFX_PRELOAD_ATTR } from '../utils/core';
+// common deps
+import { kebabCase, escapeHtml, resolveDeepRawValue, PREFFX_PRELOAD_ATTR } from '../utils/core';
+// server deps
+import type { SSRNode, SuspenseNode } from './node';
 
-export const kebabCase = (str: string): string => str.replace(/[A-Z]/g, (v) => '-' + v.toLowerCase());
+export const NODE = 'node';
+export const SUSPENSE = 'suspense';
 
 /** Serialize a style object/string into CSS text. */
 export const serializeStyle = (val: any): string => {
@@ -16,34 +20,29 @@ export const serializeStyle = (val: any): string => {
     return '';
 };
 
-/** Resolve signals/arrays into plain values. */
-export const resolve = (val: any): any => {
-    if (isSignal(val)) return resolve(val.value);
-    if (isArray(val)) return val.map(resolve);
-    return val;
-};
-
 /** A single walkable node output target */
 export type WalkFrame =
-    | { kind: 'element'; node: SSRNode }
-    | { kind: 'suspense'; node: SuspenseNode }
+    | { kind: typeof NODE; node: SSRNode }
+    | { kind: typeof SUSPENSE; node: SuspenseNode }
     | { kind: 'text'; value: unknown };
 
 /** Unwrap value into flat element / suspense / text frames */
 export function* resolveFrames(value: any): Generator<WalkFrame> {
-    const r = resolve(value);
+    const r = resolveDeepRawValue(value);
     if (r === null || r === undefined || typeof r === 'boolean') return;
     if (Array.isArray(r)) {
         for (const item of r) yield* resolveFrames(item);
         return;
     }
-    if (isSuspenseNode(r)) {
-        yield { kind: 'suspense', node: r as SuspenseNode };
-        return;
-    }
-    if (isSSRNode(r)) {
-        yield { kind: 'element', node: r as SSRNode };
-        return;
+    if (r && typeof r === 'object' && 'kind' in r) {
+        if (r.kind === SUSPENSE) {
+            yield { kind: SUSPENSE, node: r as SuspenseNode };
+            return;
+        }
+        if (r.kind === NODE) {
+            yield { kind: NODE, node: r as SSRNode };
+            return;
+        }
     }
     yield { kind: 'text', value: r };
 }
@@ -52,12 +51,6 @@ export const VOID_ELEMENTS = new Set([
     'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
     'link', 'meta', 'param', 'source', 'track', 'wbr'
 ]);
-
-/** Escape special characters for HTML text content */
-export const escapeHtml = (s: string): string => s
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>');
 
 /** Escape for attribute values (quotes + html entities) */
 export const escapeAttr = (s: string): string => escapeHtml(String(s)).replace(/"/g, '"');
@@ -88,7 +81,7 @@ export const renderOpenTag = (node: SSRNode): string => {
     const { type, props } = node;
     let attrs = '';
     if (props && typeof props === 'object') {
-        const resolvedProps = resolve(props);
+        const resolvedProps = resolveDeepRawValue(props);
         for (const key of Object.keys(resolvedProps)) {
             attrs += renderProp(resolvedProps, key, resolvedProps[key]);
         }
@@ -113,7 +106,7 @@ export function* walk(
             } else {
                 yield* walk(node.children, resources);
             }
-        } else if (frame.kind === 'element') {
+        } else if (frame.kind === NODE) {
             const node = frame.node;
             yield renderOpenTag(node);
             if (!isVoidTag(node.type)) {
