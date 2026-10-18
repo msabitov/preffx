@@ -2,8 +2,8 @@
     Signal, signal, computed,
     effect, batch, untracked,
     action, createModel,
-    ReadonlySignal
-} from "@preact/signals-core";
+    ReadonlySignal, SignalOptions
+} from './state';
 
 /**
  * Root specific utils for i18n
@@ -98,28 +98,104 @@ type PreffXContext = Record<string | symbol, any>;
 /**
  * Read-only snapshot of a resource's lifecycle
  */
-export type ResourceState<T = any> = {
+export type ResourceState<T = any, E = Error> = {
     /**
      * Resolved data (or `null` while loading / after error).
      */
     state: ReadonlySignal<T | null>;
     /**
-     * Resource is processing 
+     * Resource is processing
      */
     pending: ReadonlySignal<boolean>;
     /**
      * Resource processing error
      */
-    error: ReadonlySignal<Error | null>;
+    error: ReadonlySignal<E | null>;
+};
+
+/**
+ * Resource control API — methods to interact with the resource
+ */
+export type ResourceHandlers<T = any> = {
+    /**
+     * Re-run the fetcher
+     */
+    refetch: () => void;
+    /**
+     * Optimistically set the resolved value without re-fetching
+     */
+    mutate: (value: T | null) => void;
+    /**
+     * Abort the in-flight request and reset `pending`. Does not touch the cache.
+     */
+    cancel: () => void;
+    /**
+     * Invalidate the cached entry for this resource's `key`, so the next
+     * consumer with the same `key` re-fetches instead of reusing stale data.
+     * No-op for positional keys (no cache entry).
+     */
+    invalidate: () => void;
 };
 
 /**
  * `resource(fn)` return value
  */
-export type Resource<T = any> = [
-    result: ResourceState<T>,
-    refetch: () => void
+export type Resource<T = any, E = Error> = [
+    result: ResourceState<T, E>,
+    hadlers: ResourceHandlers<T>
 ];
+
+/**
+ * Options accepted by `resource()`.
+ */
+export type ResourceOptions<T = any> = {
+    /**
+     * Initial state
+     */
+    initial?: T;
+    /**
+     * Timeout for resolver
+     */
+    timeout?: number;
+    /**
+     * Unique identifier for caching and reusing
+     */
+    key?: string;
+    /**
+     * Keep the previous `state` while a refetch / dependency-driven re-run is in flight
+     */
+    keepPreviousState?: boolean;
+};
+
+/**
+ * Argument object form of `resource()` — fetcher + options.
+ */
+export type ResourceArg<T = any> = {
+    fetcher: (signal: AbortSignal) => Promise<T>;
+    options?: ResourceOptions<T>;
+};
+
+/**
+ * Runtime context handed to the resource implementation (server & client).
+ */
+export type ResourceContext = {
+    scope: RootScope;
+    componentPrefix: string;
+    signal: <T>(v: T, options?: SignalOptions<T>) => Signal<T>;
+    computed: <T>(fn: () => T, options?: SignalOptions<T>) => ReadonlySignal<T>;
+    effect: (fn: () => any) => any;
+    onDestroy: (target: any, fn: () => void) => void;
+    batch: typeof batch;
+};
+
+/**
+ * Mutable (writable) resource state used internally by the server/client impls.
+ */
+export type MutableState<T = any, E = Error> = {
+    state: Signal<T | null>;
+    error: Signal<E | null>;
+    pending: Signal<boolean>;
+};
 
 export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
     // signal utils
@@ -208,16 +284,14 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
      * Async resource
      * on the server it registers its fetcher for `preload()` instead of running an effect;
      * on the client it runs a source-tracking effect and returns a tuple `[res, refetch]`
-     * @param fetcher — async function; optional AbortSignal for race-guarding
+     * @param fetcher — async function; receives an AbortSignal for race-guarding
      */
-    resource: {
-        <T>(fetcher: (signal?: AbortSignal) => Promise<T>): Resource<T>;
-        <T>(params: {
-            fetcher: (signal?: AbortSignal) => Promise<T>,
-            initial?: T;
-            timeout?: number;
-        }): Resource<T>;
-   };
+    resource: <T, E = Error>(fetcher: (signal: AbortSignal) => Promise<T>, options?: {
+        initial?: T;
+        timeout?: number;
+        key?: string;
+        keepPreviousState?: boolean;
+    }) => Resource<T, E>;
 
     // lifecycle
 
@@ -377,6 +451,12 @@ export type RootScope = {
      */
     resources?: Resources;
     /**
+     * Per-root cache of resolved resource data keyed by explicit `key`.
+     * Identical keys reuse the same data.
+     * Only populated for resources with an explicit `key`.
+     */
+    resourceCache?: Map<string, ResourceCacheEntry>;
+    /**
      * Client-side hydration state, created lazily by the client `createRoot`
      * and shared down the tree by reference. Absent on the server.
      */
@@ -406,13 +486,28 @@ export type HydrationState = {
 };
 
 /**
+ * A single cached resource data entry (shared by explicit `key`).
+ * Holds only the resolved data + error; loading/pending stays per-component
+ */
+export type ResourceCacheEntry = {
+    /**
+     * State signal
+     */
+    state: Signal<unknown>;
+    /**
+     * Error signal
+     */
+    error: Signal<Error | null>;
+};
+
+/**
  * A single SSR resource entry
  */
 export type ResourceEntry = {
     /**
      * Data fetcher, shared between SSR and client
      */
-    fetcher: (signal?: AbortSignal) => Promise<unknown>;
+    fetcher: (signal: AbortSignal) => Promise<unknown>;
     /**
      * Max wait (ms) for this resource during the server preload
      */
@@ -421,6 +516,14 @@ export type ResourceEntry = {
      * Reactive resolved value
      */
     state: Signal<unknown>;
+    /**
+     * Serialized error (message/name) if the preload fetcher rejected
+     */
+    error?: Signal<{ message: string; name: string } | null>;
+    /**
+     * Whether the resource has finished loading (preload resolved)
+     */
+    pending: Signal<boolean>;
 };
 
 /**

@@ -141,7 +141,7 @@ export class Renderer {
     static register = (
         scope: RootScope,
         key: string,
-        fetcher: (signal?: AbortSignal) => Promise<unknown>,
+        fetcher: (signal: AbortSignal) => Promise<unknown>,
         timeout?: number
     ): ResourceEntry => {
         const resources = scope.resources ?? (scope.resources = new Map<string, ResourceEntry>());
@@ -150,7 +150,9 @@ export class Renderer {
         const entry: ResourceEntry = {
             fetcher,
             timeout,
-            state: preactSignal<unknown>(undefined)
+            state: preactSignal<unknown>(undefined),
+            error: preactSignal<{ message: string; name: string } | null>(null),
+            pending: preactSignal<boolean>(true)
         };
         resources.set(key, entry);
         return entry;

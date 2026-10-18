@@ -34,10 +34,20 @@ export const renderToString = (
             let resolve = promises.get(key);
             if (!resolve) {
                 resolve = (async () => {
+                    const controller = new AbortController();
                     try {
-                        entry.state.value = await entry.fetcher();
-                    } catch {
-                        entry.state.value = undefined;
+                        const value = await entry.fetcher(controller.signal);
+                        if (!controller.signal.aborted) entry.state.value = value;
+                    } catch (err) {
+                        if (!controller.signal.aborted) {
+                            entry.state.value = undefined;
+                            entry.error!.value = {
+                                message: err instanceof Error ? err.message : String(err),
+                                name: err instanceof Error ? err.name : 'Error'
+                            };
+                        }
+                    } finally {
+                        entry.pending.value = false;
                     }
                     return entry.state.value;
                 })();

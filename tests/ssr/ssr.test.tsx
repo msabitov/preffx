@@ -8,7 +8,7 @@ import { createRoot } from '../../src/server';
 const server = createRoot();
 
 const UserCard: PC<{ name: string }> = ({ name }, { resource, computed }) => {
-    const [user, refetch] = resource(async () => {
+    const [user, { refetch }] = resource(async () => {
         return { id: 1, name, email: name + '@preffx.dev' };
     });
     // New SSR contract: put a *signal* (computed) in the tree, not a baked

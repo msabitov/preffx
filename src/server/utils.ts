@@ -100,7 +100,7 @@ export function* walk(
     for (const frame of resolveFrames(value)) {
         if (frame.kind === 'suspense') {
             const node = frame.node;
-            const pendingKeys = node.keys.filter((k) => !resources?.get(k)?.state.value);
+            const pendingKeys = node.keys.filter((k) => resources?.get(k)?.pending.value);
             if (pendingKeys.length) {
                 yield* walk(node.fallback ?? null, resources);
             } else {
@@ -142,9 +142,15 @@ export const serializeData = (
     prefix: string
 ): string => {
     const data: Record<string, unknown> = {};
+    const errors: Record<string, { message: string; name: string }> = {};
     resources.forEach((entry, key) => {
-        data[key] = entry.state.value;
+        // Only serialize resources that actually resolved;
+        // pending ones are refetched on the client anyway
+        if (!entry.pending.value) {
+            if (entry.error?.value) errors[key] = entry.error.value;
+            else data[key] = entry.state.value;
+        }
     });
-    const json = serializer(data);
+    const json = serializer({ errors, data });
     return `<script ${PREFFX_PRELOAD_ATTR}="${escapeAttr(prefix)}" type="application/json">${escapeJsonScript(json)}</script>`;
 };

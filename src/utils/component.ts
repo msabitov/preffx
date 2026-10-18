@@ -1,6 +1,5 @@
 // common types
-import { PC, APC, DictProxy, RootScope, Resource } from '../types';
-import type { ResourceArg, ResourceContext } from '../utils/resource';
+import { PC, APC, DictProxy, RootScope, Resource, ResourceArg, ResourceContext, ResourceOptions } from '../types';
 // common deps
 import {
     batch,
@@ -153,7 +152,7 @@ const For: PC<{
 export type ComponentEnv = {
     Portal: PC<any>;
     Suspense: PC<any>;
-    resource: (ctx: ResourceContext) => <T>(arg: ResourceArg<T>) => Resource<T>;
+    resource: (ctx: ResourceContext) => <T, E = Error>(fetcher: ResourceArg<T>['fetcher'], options?: ResourceOptions<T>) => Resource<T, E>;
     signal: <T>(v: T, options?: SignalOptions<T>) => Signal<T>;
     computed: <T>(fn: () => T, options?: SignalOptions<T>) => ReadonlySignal<T>;
     effect: (fn: () => any) => any;
@@ -216,7 +215,7 @@ export const createComponent = (env: ComponentEnv) => {
                 const onDestroy = (fn: () => void | Promise<void>) => callbacks.destroy.add(fn);
 
                 // resource bound to this component scope
-                const resourceFn = resource({ scope, componentPrefix, signal, effect, onDestroy: onDestroyCallback, batch });
+                const resourceFn = resource({ scope, componentPrefix, signal, computed, effect, onDestroy: onDestroyCallback, batch });
 
                 /**
                  * useState emulation

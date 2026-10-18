@@ -5,6 +5,16 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-10-18
+
+### Fixed
+- `resource()` fetcher now always receives an `AbortSignal` (previously `undefined` on the server), so the signal signature is consistent across server and client. On the server a real `AbortController` is created per resource; if the signal is aborted, neither data nor error are applied — matching the client semantics
+
+### Changed
+- **breaking:** the `resource()` return format changed — the second element of the tuple is no longer a single `refetch` function but an object of handlers (`{ refetch, mutate, cancel, invalidate }`). Existing code that destructured `const [, refetch] = resource(...)` must switch to `const [, { refetch }] = resource(...)`
+- **breaking:** the `resource()` signature is unified to `resource(fetcher, options?)`; the previous overload accepting an object form `{ fetcher, options }` is removed. The option fields themselves (`initial`, `timeout`, `key`, `keepPreviousState`) are unchanged
+- resource-related types (`ResourceOptions`, `ResourceArg`, `ResourceContext`, `MutableState`) are consolidated into `src/types.ts` instead of being duplicated in `src/utils/resource.ts`
+
 ## [0.8.1] - 2026-10-11
 
 ### Fixed
@@ -205,7 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.8.1]: https://github.com/msabitov/preffx
+[0.9.0]: https://github.com/msabitov/preffx
+[0.8.1]: https://github.com/msabitov/preffx/commit/1512fac3635978d97b9f4e250fa1dbbc28f871b7
 [0.8.0]: https://github.com/msabitov/preffx/commit/7e4337c0031c8e07536c7b20f982b92970b7a3f6
 [0.7.5]: https://github.com/msabitov/preffx/commit/9dba07105ef2622de39e16f574259286c71bac09
 [0.7.4]: https://github.com/msabitov/preffx/commit/52c49431d76dbb3d66a6486be2e1d9f0af1aed09
