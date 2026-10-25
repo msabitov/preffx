@@ -1,15 +1,16 @@
 import { Signal } from '../state';
+import { LIBRARY, LIBRARY_LOWER } from './constants';
 
 // types
 export type TPreffXItem = {
     [key in (typeof mountSymbol | typeof destroySymbol | typeof Symbol.dispose)]: Function;
 };
 // symbols
-const mountSymbol = Symbol('PreffX.mount');
-const destroySymbol = Symbol('PreffX.destroy');
-const destroyedSymbol = Symbol('PreffX.destroyed');
-// per-root preload script attribute: `<script data-preffx-preload="<root prefix>">`
-export const PREFFX_PRELOAD_ATTR = 'data-preffx-preload';
+const mountSymbol = Symbol(LIBRARY + '.mount');
+const destroySymbol = Symbol(LIBRARY + '.destroy');
+const destroyedSymbol = Symbol(LIBRARY + '.destroyed');
+// per-root preload script attribute which value is root prefix
+export const PREFFX_PRELOAD_ATTR = `data-${LIBRARY_LOWER}-preload`;
 // base utils
 export const isArray = (val: any) => Array.isArray(val);
 export const isSignal = (val: any) => val instanceof Signal;

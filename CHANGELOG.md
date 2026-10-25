@@ -5,6 +5,14 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-10-25
+
+### Added
+- tests for JSX entry points
+
+### Changed
+- the library name has been moved to a `constants` module and is now used when naming symbols and special attributes
+
 ## [0.9.0] - 2026-10-18
 
 ### Fixed
@@ -215,7 +223,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.9.0]: https://github.com/msabitov/preffx
+[0.9.1]: https://github.com/msabitov/preffx 
+[0.9.0]: https://github.com/msabitov/preffx/commit/58d9c0e6a2461f9b7d78fca7c8acaa1c7fb0d99e
 [0.8.1]: https://github.com/msabitov/preffx/commit/1512fac3635978d97b9f4e250fa1dbbc28f871b7
 [0.8.0]: https://github.com/msabitov/preffx/commit/7e4337c0031c8e07536c7b20f982b92970b7a3f6
 [0.7.5]: https://github.com/msabitov/preffx/commit/9dba07105ef2622de39e16f574259286c71bac09

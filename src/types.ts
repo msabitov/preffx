@@ -73,7 +73,7 @@ export type PreffXMountConfig = {
     props?: object;
     /**
      * Parse the server-sent per-root preload data during hydration.
-     * The scope of the payload is the root prefix (`data-preffx-preload`).
+     * The scope of the payload is the root prefix
      * @default JSON.parse
      */
     parser?: (s: string) => unknown;

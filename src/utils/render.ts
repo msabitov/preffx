@@ -8,9 +8,10 @@ import type {
 } from '../types';
 // common deps
 import { signal as preactSignal } from '../state';
+import { LIBRARY } from './constants';
 
-export const pathSymbol = Symbol('preffx-path');
-export const routeParamsSymbol = Symbol('preffx-route-params');
+export const pathSymbol = Symbol(LIBRARY + '.path');
+export const routeParamsSymbol = Symbol(LIBRARY + '.routeParams');
 
 /**
  * Boundary utilities, exposed as static members
