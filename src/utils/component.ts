@@ -283,7 +283,9 @@ export const createComponent = (env: ComponentEnv) => {
                     const dictSignal = preactSignal(initial ?? ({} as T));
                     preactEffect(() => {
                         const langValue = readonlyLang.value;
-                        const resolver = resolvers[langValue] || resolvers['*'];
+                        const langValueParts = langValue.split('-');
+                        // lang can be "en-US" for example
+                        const resolver = resolvers[langValue] || langValueParts[0] !== langValue && resolvers[langValueParts[0]] || resolvers['*'];
                         if (!resolver) {
                             dictSignal.value = {} as T;
                             return;

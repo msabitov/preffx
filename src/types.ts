@@ -479,10 +479,6 @@ export type HydrationState = {
      * Read cursor into the current hydrate queue
      */
     index: number;
-    /**
-     * Per-key hydration subscribers; a map avoids a linear scan
-     */
-    subs: Map<string, Set<() => void>>;
 };
 
 /**

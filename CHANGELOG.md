@@ -5,6 +5,17 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-11-01
+
+### Added
+- tests for dictionary resolution with a region-qualified root locale (e.g. `en-US`)
+
+### Fixed
+- dictionary (`dict`) resolver now falls back correctly for region-qualified locales: when the exact locale (e.g. `en-US`) is missing, it tries the base language part (`en`) before the `*` fallback, instead of going straight to `*`
+
+### Changed
+- removed the unreachable `whenHydrated` hydration path from the client `resource()`: the callback could never fire because `setHydratedData` runs once at mount time (before the tree subscribes). The dead subscription code and the per-key subscriber map (`subs`) on `HydrationState` are dropped, simplifying `src/client/hydration.ts` and the `HydrationState` type without changing public behavior
+
 ## [0.9.1] - 2026-10-25
 
 ### Added

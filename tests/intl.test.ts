@@ -247,6 +247,17 @@ describe('Intl', () => {
             root.destroy();
         });
 
+        test('sync resolver returns correct dict with extended root lang locale', async () => {
+            const root = createRoot({ defaultLang: 'en-US' });
+            root.mount(DictComponent, { node: rootElement });
+            await tick(50);
+
+            expect(rootElement.querySelector('#dict-title')?.textContent).toBe('Hello');
+            expect(rootElement.querySelector('#dict-desc')?.textContent).toBe('My name is PreffX');
+
+            root.destroy();
+        });
+
         test('async resolver loads and returns dict', async () => {
             const root = createRoot({ defaultLang: 'ru' });
 

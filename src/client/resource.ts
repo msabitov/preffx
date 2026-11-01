@@ -7,10 +7,10 @@ import {
     resetLoading, setResolved, setFailed, setErrorOnly, setDataOnly
 } from '../utils/resource';
 // client deps
-import { getHydratedData, whenHydrated } from './hydration';
+import { getHydratedData } from './hydration';
 
 export const resource = ({
-    scope, componentPrefix, signal, effect, onDestroy, batch
+    scope, componentPrefix, signal, effect, batch
 }: ResourceContext) => <T = any, E = Error>(fetcher: ResourceArg<T>['fetcher'], options?: ResourceOptions<T>): Resource<T, E> => {
     const { fetcher: fn, initial, key: customKey, timeout, keepPreviousState } = parseArg(fetcher, options);
     const key = customKey ?? resourceKey(scope, componentPrefix);
@@ -49,23 +49,6 @@ export const resource = ({
         setErrorOnly(res, err as E, batch);
     } else if (hydratedValue !== undefined) {
         setDataOnly(res, hydratedValue as T, batch);
-    }
-    if (!hydrated && hydration) {
-        const unsubscribe = whenHydrated(hydration, [key], () => {
-            const data = getHydratedData(hydration) as
-                | { errors?: Record<string, { message: string; name: string }>; data?: Record<string, unknown> }
-                | undefined;
-            const err = data?.errors?.[key];
-            const value = err ? data?.data?.[key] : undefined;
-            if (!!err) {
-                const e = new Error(err.message);
-                e.name = err.name;
-                setErrorOnly(res, e as E, batch);
-            } else if (value !== undefined) {
-                setDataOnly(res, value as T, batch);
-            }
-        });
-        onDestroy(res.state, unsubscribe);
     }
 
     let abortController: AbortController | null = null;

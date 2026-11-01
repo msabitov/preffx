@@ -173,7 +173,7 @@ export function createRoot(params?: Omit<PreffXRootParams, 'utils'>) {
             const scope: RootScope = Renderer.resetScope(rootScope, {...rootContext});
             scope.env = { node: createNode, component, text: createTextNode };
             if (hydrated) {
-                const hydration = scope.hydration ?? (scope.hydration = { index: 0, subs: new Map() });
+                const hydration = scope.hydration ?? (scope.hydration = { index: 0 });
                 setHydratedData(hydration, hydrated);
             }
             withHydrateScope(scope, queue, () => {
