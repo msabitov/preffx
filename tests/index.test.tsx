@@ -1420,6 +1420,39 @@ describe('Hydrate existing DOM', () => {
         root.destroy();
     });
 
+    test('hydration validates tagName and creates a fresh node on mismatch', async () => {
+        // Hydration must NOT reuse the <span>
+        // because the tag mismatch is detected
+        hydRoot.innerHTML =
+            '<div id="wrap">' +
+                '<span id="server-span">server</span>' +
+            '</div>' +
+            '<script data-preffx-preload="app" type="application/json">{}</script>';
+
+        const serverSpan = hydRoot.querySelector('#server-span')!;
+
+        const MismatchApp: PC = () => h('div', {
+            id: 'wrap',
+            children: [
+                h('p', { id: 'client-p', children: ['client'] })
+            ]
+        });
+
+        const root = createRoot({ prefix: 'app' });
+        root.mount(MismatchApp, { node: hydRoot });
+        await tick(0);
+
+        const p = hydRoot.querySelector('#client-p')!;
+        expect(p.tagName.toLowerCase()).toBe('p');
+        expect(p.textContent).toBe('client');
+        // the stale server <span> is gone (replaced by the fresh <p>)
+        expect(hydRoot.querySelector('#server-span')).toBeNull();
+        // the original span element was not mutated into the client node
+        expect(serverSpan.tagName.toLowerCase()).toBe('span');
+
+        root.destroy();
+    });
+
     test('reactivity binds to the hydrated node in-place (node count stable)', async () => {
         hydRoot.innerHTML =
             '<button id="btn">0</button>' +

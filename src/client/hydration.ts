@@ -8,9 +8,19 @@ export const setHydratedData = (state: HydrationState, data?: Record<string, unk
 export const getHydratedData = (state: HydrationState | undefined): Record<string, unknown> | undefined =>
     state?.data;
 
-export const takeHydrateNode = (state: HydrationState | undefined): Element | undefined => {
+/**
+ * Take the element from the hydration queue
+ * (if it matches tag and namespace)
+ */
+export const takeHydrateNode = (
+    state: HydrationState | undefined,
+    expected: { tag: string; ns?: string }
+): Element | undefined => {
     if (!state?.queue) return undefined;
-    return state.queue[state.index++];
+    const element = state.queue[state.index];
+    if (!element || element.tagName.toLowerCase() !== expected.tag || expected.ns && element.namespaceURI !== expected.ns) return undefined;
+    state.index++;
+    return element;
 };
 
 /**

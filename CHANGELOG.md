@@ -5,6 +5,12 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-11-08
+
+### Fixed
+
+- hydration now validates the tag name and namespace of the queued server-rendered element before reusing it: on mismatch the client creates a fresh node instead of a mismatched server element (test added)
+
 ## [0.9.2] - 2026-11-01
 
 ### Added
@@ -234,7 +240,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.9.1]: https://github.com/msabitov/preffx 
+[0.9.3]: https://github.com/msabitov/preffx
+[0.9.2]: https://github.com/msabitov/preffx/commit/ce2889a5c19dfd4abe47c65c19c1b52725d7fd88
+[0.9.1]: https://github.com/msabitov/preffx/commit/1eca6a6a8e784005d66a289e0fb63850c1fb9d2f
 [0.9.0]: https://github.com/msabitov/preffx/commit/58d9c0e6a2461f9b7d78fca7c8acaa1c7fb0d99e
 [0.8.1]: https://github.com/msabitov/preffx/commit/1512fac3635978d97b9f4e250fa1dbbc28f871b7
 [0.8.0]: https://github.com/msabitov/preffx/commit/7e4337c0031c8e07536c7b20f982b92970b7a3f6

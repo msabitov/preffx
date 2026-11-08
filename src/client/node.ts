@@ -315,8 +315,12 @@ export const node = ({
 
     // during active hydration reuse the existing server-rendered
     // element (positional matching) instead of materialising a fresh one.
+    // Create a new element if queued element has not the same tag and namespace
     const hydration = Renderer.getScope()?.hydration;
-    const hydratedNode = !!hydration?.queue ? takeHydrateNode(hydration) : undefined;
+    const hydratedNode = !!hydration?.queue
+        ? takeHydrateNode(hydration, {
+            tag: type, ns: NS[($ns || TAG_NS[type] || 'html') as keyof typeof NS]
+        }) : undefined;
     const node = (hydratedNode || createElement($ns, type, props && props.is ? {
         is: props.is
     } : undefined)) as unknown as (Node & TPreffXItem);
