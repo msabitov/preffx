@@ -4,7 +4,6 @@ import type {
     ResourceContext, MutableState, ResourceArg, ResourceOptions
 } from '../types';
 // common deps
-import { batch } from '../state';
 import { Renderer } from '../utils/render';
 
 export const resourceKey = (scope: RootScope, componentPrefix: string) =>
@@ -86,11 +85,15 @@ export const useCacheEntry = (
     return entry;
 };
 
-export const registerBoundary = (key: string, pending: ResourceState['pending']) => {
-    const boundary = Renderer.currentBoundary();
+export const registerBoundary = (
+    scope: RootScope,
+    key: string,
+    pending: ResourceState['pending']
+) => {
+    const boundary = scope.boundary;
     if (boundary) {
         boundary.keys.push(key);
-        boundary.pending.push(pending);
+        boundary.pending.value = [...boundary.pending.value, pending];
     }
 };
 

@@ -1,5 +1,8 @@
 // common types
-import { PC, APC, DictProxy, RootScope, Resource, ResourceArg, ResourceContext, ResourceOptions } from '../types';
+import {
+    PC, APC, DictProxy, RootScope, HydrateCursor,
+    Resource, ResourceArg, ResourceContext, ResourceOptions
+} from '../types';
 // common deps
 import {
     batch,
@@ -15,10 +18,11 @@ import {
     state, reducer
 } from '../state';
 import {
-    destroy, isPromise, resolveDeepRawValue, resolveValue, onDestroyCallback,
+    destroy, isPromise, isSignal, resolveDeepRawValue, resolveValue, onDestroyCallback,
 } from '../utils/core';
 import { matchPath } from '../utils/routing';
 import { pathSymbol, Renderer, routeParamsSymbol } from '../utils/render';
+import { h, materialize } from '../vnode';
 
 type RoutesPaths = Record<string, PC<any> | APC<any>>;
 
@@ -43,13 +47,10 @@ const Catch: PC<{
         if (errors.length) {
             if (typeof fallback === 'function') {
                 try {
-                    return Renderer.getEnv()!.component({
-                        type: fallback,
-                        props: {
-                            ...props,
-                            errors
-                        }
-                    })
+                    return h(fallback, {
+                        ...props,
+                        errors
+                    });
                 } catch (e) {
                     return e;
                 }
@@ -75,22 +76,28 @@ const Defer: PC<{
     return defered;
 };
 
-const For: PC<{
+/**
+ * `For` component factory
+ */
+export const createFor = (scope: RootScope, cursor?: HydrateCursor): PC<{
     items: Signal<any[]>;
     callback: (item: any) => any;
     fallback: any;
-}> = ({items, callback, fallback}, {
+}> => ({items, callback, fallback}, {
     signal,
     computed,
     effect,
     onMount, onDestroy
 }) => {
-    const cache = signal(new Map<any, Node[] | null>());
+    const cache = signal(new Map<any, any>());
     const prev = signal<any[]>([]);
     const getNextCache = (item: any, val: any) => {
         const nextMap = new Map(cache.peek().entries());
         return nextMap.set(item, val);
     };
+
+    // to use hydration positions only for the first pass
+    let hydrating = !!cursor;
 
     // recalc if children changed
     effect(() => {
@@ -105,7 +112,9 @@ const For: PC<{
                 const value = resolveDeepRawValue(item);
                 // no cached value
                 if (!cache.peek().has(item)) {
-                    cache.value = getNextCache(item, callback(value));
+                    cache.value = getNextCache(item, materialize(
+                        callback(value), scope, hydrating ? cursor : undefined
+                    ));
                 }
                 return () => {
                     // value changed - cached is invalid
@@ -125,6 +134,8 @@ const For: PC<{
 
         // items changed
         prev.value = arr;
+        // to avoid hydrations for the next calls
+        hydrating = false;
     });
 
     onMount(() => {
@@ -150,8 +161,18 @@ const For: PC<{
 };
 
 export type ComponentEnv = {
-    Portal: PC<any>;
-    Suspense: PC<any>;
+    /**
+     * `Portal` component factory
+     */
+    createPortal: (scope: RootScope) => PC<any>;
+    /**
+     * `For` component factory
+     */
+    createFor: (scope: RootScope, cursor?: HydrateCursor) => PC<any>;
+    /**
+     * `Suspense` component factory
+     */
+    createSuspense: (scope: RootScope, cursor?: HydrateCursor) => PC<any>;
     resource: (ctx: ResourceContext) => <T, E = Error>(fetcher: ResourceArg<T>['fetcher'], options?: ResourceOptions<T>) => Resource<T, E>;
     signal: <T>(v: T, options?: SignalOptions<T>) => Signal<T>;
     computed: <T>(fn: () => T, options?: SignalOptions<T>) => ReadonlySignal<T>;
@@ -166,11 +187,12 @@ export type ComponentEnv = {
         utils: any;
         scope: RootScope;
         callbacks: { mount: Set<Function>; destroy: Set<Function> };
+        cursor?: HydrateCursor;
     }) => any;
 };
 
 export const createComponent = (env: ComponentEnv) => {
-    const { signal, computed, effect, resource, Portal, Suspense, render } = env;
+    const { signal, computed, effect, resource, createPortal, createSuspense, createFor, render } = env;
 
     const component = ({
         type,
@@ -178,8 +200,7 @@ export const createComponent = (env: ComponentEnv) => {
     }: {
         type: Function;
         props: any;
-    }) => {
-        const parentScope = Renderer.getScope();
+    }, parentScope: RootScope, cursor?: HydrateCursor) => {
         if (!parentScope) throw new Error('component() must be called within a root scope (inside createRoot().mount)');
 
         // prepare ctx — inherit parent context, extend with routing props
@@ -196,157 +217,175 @@ export const createComponent = (env: ComponentEnv) => {
             idCounter: 0
         };
 
-        return Renderer.withScope({
-            scope,
-            callback: () => {
-                // each component gets a unique component prefix within the root mount
-                const componentPrefix = scope.prefix + Renderer.toRadixString(++scope.shared.index) + '-';
-                const id = () => componentPrefix + Renderer.toRadixString(scope.idCounter++);
+        // each component gets a unique component prefix within the root mount
+        const componentPrefix = scope.prefix + Renderer.toRadixString(++scope.shared.index) + '-';
+        const id = () => componentPrefix + Renderer.toRadixString(scope.idCounter++);
 
-                // prepare lifecycle callbacks
-                const callbacks: {
-                    mount: Set<Function>;
-                    destroy: Set<Function>;
-                } = {
-                    mount: new Set(),
-                    destroy: new Set(),
-                };
-                const onMount = (fn: () => void | Promise<void>) => callbacks.mount.add(fn);
-                const onDestroy = (fn: () => void | Promise<void>) => callbacks.destroy.add(fn);
+        // create special components with correct scope
+        const Portal = createPortal(scope);
+        const Suspense = createSuspense(scope, cursor);
+        const For = createFor(scope, cursor);
 
-                // resource bound to this component scope
-                const resourceFn = resource({ scope, componentPrefix, signal, computed, effect, onDestroy: onDestroyCallback, batch });
+        // prepare lifecycle callbacks
+        const callbacks: {
+            mount: Set<Function>;
+            destroy: Set<Function>;
+        } = {
+            mount: new Set(),
+            destroy: new Set(),
+        };
+        const onMount = (fn: () => void | Promise<void>) => callbacks.mount.add(fn);
+        const onDestroy = (fn: () => void | Promise<void>) => callbacks.destroy.add(fn);
 
-                /**
-                 * useState emulation
-                 * @param initial - initial value
-                 * @returns [signal, set] – state signal and setState function
-                 */
-                const useState = <T>(
-                    initial: T | (() => T)
-                ): [ReadonlySignal<T>, (value: T | ((prev: T) => T)) => void] => {
-                    return state<T>(initial, { signal, computed });
-                };
-
-                /**
-                 * useReducer emulation
-                 * @param fn - reducer function
-                 * @returns [state, dispatch] – state signal and dispatch function
-                 */
-                const useReducer = <S, A>(
-                    fn: (state: S, action: A) => S,
-                    init: S | (() => S)
-                ): [ReadonlySignal<S>, (action: A) => void] => {
-                    return reducer<S, A>(fn, init, { signal, computed });
-                };
-                const routes = (paths: RoutesPaths) => {
-                    const matchResult = computed(() => {
-                        const fullPathname = readonlyUrl.value.pathname;
-
-                        for (const pattern of Object.keys(paths)) {
-                            const effectivePattern = pattern.startsWith('/')
-                                ? pattern
-                                : `${basePath}/${pattern}`.replace(/\/+/g, '/');
-
-                            const result = matchPath(effectivePattern, fullPathname);
-                            if (result) return {result, pattern, effectivePattern};
-                        }
-                        return null;
-                    });
-
-                    return computed(() => {
-                        const paramsValue = matchResult.value;
-                        if (paramsValue) {
-                            const {result, pattern, effectivePattern} = paramsValue;
-                            return component({
-                                type: paths[pattern],
-                                props: {
-                                    [pathSymbol]: effectivePattern,
-                                    [routeParamsSymbol]: result.params
-                                }
-                            });
-                        }
-                        return null;
-                    });
-                };
-
-                // Extract per-root lang signal from scope utils
-                const readonlyLang = scope.utils.lang;
-                const setLang = scope.utils.setLang;
-                const readonlyUrl = scope.utils.url;
-                const navigate = scope.utils.navigate;
-
-                const dict = <T extends object>(
-                    resolvers: Record<string, () => (T | Promise<T>)>,
-                    initial?: T
-                ): DictProxy<T> => {
-                    const dictSignal = preactSignal(initial ?? ({} as T));
-                    preactEffect(() => {
-                        const langValue = readonlyLang.value;
-                        const langValueParts = langValue.split('-');
-                        // lang can be "en-US" for example
-                        const resolver = resolvers[langValue] || langValueParts[0] !== langValue && resolvers[langValueParts[0]] || resolvers['*'];
-                        if (!resolver) {
-                            dictSignal.value = {} as T;
-                            return;
-                        }
-                        const result = resolver();
-                        if (!isPromise(result)) {
-                            dictSignal.value = result as T;
-                            return;
-                        }
-                        let cancelled = false;
-                        (result as Promise<T>).then(dict => {
-                            if (!cancelled) dictSignal.value = dict;
-                        }).catch(() => {
-                            if (!cancelled) dictSignal.value = {} as T;
-                        });
-                        return () => { cancelled = true; };
-                    });
-
-                    // Per-field computed cache (for non-function access)
-                    const fieldCache = new Map<string, ReadonlySignal<any>>();
-                    return new Proxy({} as DictProxy<T>, {
-                        get(_, key) {
-                            if (typeof key !== 'string') return Reflect.get(_, key);
-                            const field = () => (dictSignal.value as any)[key];
-                            // functional field
-                            if (typeof (dictSignal.peek() as any)[key] === 'function') {
-                                return (...args: any[]) => preactComputed(() => field()(...args));
-                            }
-                            // scalar field
-                            if (!fieldCache.has(key)) {
-                                fieldCache.set(key, preactComputed(field));
-                            }
-                            return fieldCache.get(key)!;
-                        },
-                    });
-                };
-
-                const utils = {
-                    signal, computed, effect,
-                    untracked, batch, createModel, action,
-                    // emulations
-                    state: useState, reducer: useReducer,
-                    // context
-                    context,
-                    // unique identifiers
-                    id,
-                    // routing
-                    url: readonlyUrl, navigate, routes, routeParams,
-                    // intl
-                    lang: readonlyLang, setLang, dict,
-                    // lifecycle
-                    onMount, onDestroy,
-                    // special components
-                    Portal, Catch, For, Defer, Suspense,
-                    // resources
-                    resource: resourceFn
-                };
-
-                return render({ type, props, utils, scope, callbacks });
+        const resolve = (type: Function, props?: any): any => {
+            const node = materialize(h(type, props), scope);
+            onDestroy(() => destroy(node));
+            if (isSignal(node)) {
+                const value = node.peek();
+                // for async component `then` shim awaits the result
+                if (isPromise(value)) return node;
+                // error should be thrown
+                if (value instanceof Error) throw value;
+                // a component may return its own signal
+                if (isSignal(value)) return value;
+                return value;
             }
-        });
+            return node;
+        };
+
+        // resource bound to this component scope
+        const resourceFn = resource({ scope, componentPrefix, signal, computed, effect, onDestroy: onDestroyCallback, batch });
+
+        /**
+         * useState emulation
+         * @param initial - initial value
+         * @returns [signal, set] – state signal and setState function
+         */
+        const useState = <T>(
+            initial: T | (() => T)
+        ): [ReadonlySignal<T>, (value: T | ((prev: T) => T)) => void] => {
+            return state<T>(initial, { signal, computed });
+        };
+
+        /**
+         * useReducer emulation
+         * @param fn - reducer function
+         * @returns [state, dispatch] – state signal and dispatch function
+         */
+        const useReducer = <S, A>(
+            fn: (state: S, action: A) => S,
+            init: S | (() => S)
+        ): [ReadonlySignal<S>, (action: A) => void] => {
+            return reducer<S, A>(fn, init, { signal, computed });
+        };
+        const routes = (paths: RoutesPaths) => {
+            const matchResult = computed(() => {
+                const fullPathname = readonlyUrl.value.pathname;
+
+                for (const pattern of Object.keys(paths)) {
+                    const effectivePattern = pattern.startsWith('/')
+                        ? pattern
+                        : `${basePath}/${pattern}`.replace(/\/+/g, '/');
+
+                    const result = matchPath(effectivePattern, fullPathname);
+                    if (result) return {result, pattern, effectivePattern};
+                }
+                return null;
+            });
+
+            return computed(() => {
+                const paramsValue = matchResult.value;
+                if (paramsValue) {
+                    const {result, pattern, effectivePattern} = paramsValue;
+                    return component({
+                        type: paths[pattern],
+                        props: {
+                            [pathSymbol]: effectivePattern,
+                            [routeParamsSymbol]: result.params
+                        }
+                    }, scope);
+                }
+                return null;
+            });
+        };
+
+        // Extract per-root lang signal from scope utils
+        const readonlyLang = scope.utils.lang;
+        const setLang = scope.utils.setLang;
+        const readonlyUrl = scope.utils.url;
+        const navigate = scope.utils.navigate;
+
+        const dict = <T extends object>(
+            resolvers: Record<string, () => (T | Promise<T>)>,
+            initial?: T
+        ): DictProxy<T> => {
+            const dictSignal = preactSignal(initial ?? ({} as T));
+            preactEffect(() => {
+                const langValue = readonlyLang.value;
+                const langValueParts = langValue.split('-');
+                // lang can be "en-US" for example
+                const resolver = resolvers[langValue] || langValueParts[0] !== langValue && resolvers[langValueParts[0]] || resolvers['*'];
+                if (!resolver) {
+                    dictSignal.value = {} as T;
+                    return;
+                }
+                const result = resolver();
+                if (!isPromise(result)) {
+                    dictSignal.value = result as T;
+                    return;
+                }
+                let cancelled = false;
+                (result as Promise<T>).then(dict => {
+                    if (!cancelled) dictSignal.value = dict;
+                }).catch(() => {
+                    if (!cancelled) dictSignal.value = {} as T;
+                });
+                return () => { cancelled = true; };
+            });
+
+            // Per-field computed cache (for non-function access)
+            const fieldCache = new Map<string, ReadonlySignal<any>>();
+            return new Proxy({} as DictProxy<T>, {
+                get(_, key) {
+                    if (typeof key !== 'string') return Reflect.get(_, key);
+                    const field = () => (dictSignal.value as any)[key];
+                    // functional field
+                    if (typeof (dictSignal.peek() as any)[key] === 'function') {
+                        return (...args: any[]) => preactComputed(() => field()(...args));
+                    }
+                    // scalar field
+                    if (!fieldCache.has(key)) {
+                        fieldCache.set(key, preactComputed(field));
+                    }
+                    return fieldCache.get(key)!;
+                },
+            });
+        };
+
+        const utils = {
+            signal, computed, effect,
+            untracked, batch, createModel, action,
+            // emulations
+            state: useState, reducer: useReducer,
+            // context
+            context,
+            // unique identifiers
+            id,
+            // routing
+            url: readonlyUrl, navigate, routes, routeParams,
+            // intl
+            lang: readonlyLang, setLang, dict,
+            // lifecycle
+            onMount, onDestroy,
+            // async jsx
+            resolve,
+            // special components
+            Portal, Catch, For, Defer, Suspense,
+            // resources
+            resource: resourceFn
+        };
+
+        return render({ type, props, utils, scope, callbacks, cursor });
     };
     return component;
 };

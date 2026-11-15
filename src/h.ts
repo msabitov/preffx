@@ -1,22 +1,14 @@
-import { Renderer } from './utils/render';
 import { Fragment } from './utils/component';
-import { isArray } from './utils/core';
+import { h as createVNode, VNode } from './vnode';
 
 /**
- * Create PreffX reactive nodes/components
+ * Create a PreffX virtual node
  */
 export function h(
     type: string | Function,
-    rawProps: Record<string, any>
-) {
-    const props = rawProps ? {...rawProps} : {};
-    if (Object.hasOwn(props, 'children') && !isArray(props.children)) props.children = [props.children];
-    const env = Renderer.getEnv();
-    if (!env) throw new Error('h() must be called within root methods (mount / renderToString)');
-    if (typeof type === 'function') {
-        return env.component({ type, props });
-    }
-    return env.node({ type, props });
+    rawProps?: Record<string, any>
+): VNode {
+    return createVNode(type, rawProps);
 }
 
 export { Fragment };

@@ -2,9 +2,7 @@
 import type {
     RootUtils,
     RootScope,
-    ResourceEntry,
-    SuspenseBoundary,
-    Env
+    ResourceEntry
 } from '../types';
 // common deps
 import { signal as preactSignal } from '../state';
@@ -30,16 +28,6 @@ export class Renderer {
     static nextPrefix = (prefix?: string): string =>
         prefix || 'fx' + (++Renderer.rootCount) + '_';
 
-    /**
-     * The scope currently being rendered
-     */
-    static currentScope: RootScope | undefined;
-
-    /**
-     * Stack of open `Suspense` boundaries; `resource()` binds nearest
-     */
-    static boundaryStack: SuspenseBoundary[] = [];
-
     static createContext = (context?: object): Record<string | symbol, any> => {
         return {
             ...(context || {}),
@@ -47,42 +35,6 @@ export class Renderer {
             [routeParamsSymbol]: {}
         };
     }
-
-    /**
-     * Run `fn` while `scope` is active, restoring the previous scope
-     */
-    static withScope = <T>(config: {
-        scope: RootScope | undefined,
-        callback: () => T
-    }): T => {
-        const { callback, scope } = config;
-        const prev = Renderer.currentScope;
-        Renderer.currentScope = scope;
-        try {
-            return callback();
-        } finally {
-            Renderer.currentScope = prev;
-        }
-    };
-
-    /**
-     * Run `fn` while root `scope` is active
-     */
-    static withRootScope = <T>(config: {
-        scope: RootScope | undefined,
-        callback: () => T
-    }): T => Renderer.withScope(config);
-
-    /**
-     * Get the active rendering scope, or `undefined` outside rendering
-     */
-    static getScope = (): RootScope | undefined => Renderer.currentScope;
-
-    /**
-     * The active node/component environment (client or server),
-     *  or `undefined` outside rendering
-     */
-    static getEnv = (): Env | undefined => Renderer.currentScope?.env;
 
     /**
      * Create a fresh root scope for a mount
@@ -116,24 +68,6 @@ export class Renderer {
         scope.shared = { index: 0 };
         return scope;
     };
-
-    /**
-     * Enter the nearest-enclosing boundary context for the duration of `fn`
-     */
-    static inBoundary = <T>(b: SuspenseBoundary, fn: () => T): T => {
-        Renderer.boundaryStack.push(b);
-        try {
-            return fn();
-        } finally {
-            Renderer.boundaryStack.pop();
-        }
-    };
-
-    /**
-     * The innermost currently-open boundary, or `undefined` outside Suspense
-     */
-    static currentBoundary = (): SuspenseBoundary | undefined =>
-        Renderer.boundaryStack[Renderer.boundaryStack.length - 1];
 
     /**
      * Register a resource fetcher into the root's `resources` map under `key`,

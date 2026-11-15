@@ -24,7 +24,7 @@ export const resource = ({
         error: cacheEntry?.error as Signal<E | null> ?? signal<E | null>(null),
         pending
     };
-    registerBoundary(key, res.pending as ResourceState['pending']);
+    registerBoundary(scope, key, res.pending as ResourceState['pending']);
     const refetchCounter = signal(0);
     const refetch = () => { refetchCounter.value++; };
     const mutate = (value: T | null) => {

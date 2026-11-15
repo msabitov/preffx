@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { h, Fragment, createRoot, PC } from '../src/index';
+import { h, Fragment, createRoot, PC, APC } from '../src/index';
 import { signal } from '../src/state';
 import { createRoot as createServerRoot } from '../src/server';
 
@@ -361,6 +361,49 @@ describe('client resource', () => {
         // With `initial`, data is already available, so pending starts false
         // and Suspense does not show a fallback.
         expect(rootElement.querySelector('#initial-pending')?.textContent).toBe('cached');
+        root.destroy();
+    });
+
+    test('resource created after await is bound to the component scope', async () => {
+        // The resource factory is closed over the component scope, so creating
+        // it after `await` still registers it on the right root.
+        let state: any;
+        const AsyncComponent: APC = async (_, utils) => {
+            await tick();
+            const [res] = utils.resource(async () => 'data');
+            await tick(5);
+            state = res.state.value;
+            return null;
+        };
+        const root = createRoot();
+        root.mount(AsyncComponent, { node: setupRoot() });
+        await tick(30);
+
+        expect(state).toBe('data');
+        root.destroy();
+    });
+
+    test('resource created after await registers in the enclosing Suspense boundary', async () => {
+        const AsyncChild: APC = async (_, utils) => {
+            await tick();
+            utils.resource(async () => {
+                await tick(20);
+                return 'late';
+            });
+            return h('span', { id: 'suspense-after-await', children: ['content'] });
+        };
+
+        const App: PC = (_, utils) => utils.Suspense({
+            callback: () => h(AsyncChild, {}),
+            fallback: h('span', { id: 'fallback', children: ['loading'] })
+        }, utils);
+
+        const root = createRoot();
+        root.mount(App, { node: setupRoot() });
+        await tick(5);
+
+        // while the resource is in flight the fallback must be visible
+        expect(rootElement.querySelector('#fallback')?.textContent).toBe('loading');
         root.destroy();
     });
 });

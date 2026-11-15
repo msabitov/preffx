@@ -1,14 +1,15 @@
+// common types
+import type { HydrateCursor, RootScope } from '../types';
 // common deps
 import { createModel, effect, Signal } from '../state';
 import {
     mount, destroy, onMountCallback, onDestroyCallback,
     isSignal, resolveValue, kebabCase, TPreffXItem
 } from '../utils/core';
-import { Renderer } from '../utils/render';
 // client deps
 import { childrenEffects } from './children';
 import { createNode } from './utils';
-import { takeHydrateNode } from './hydration';
+import { createCursor, hydrateNode } from './hydration';
 
 const HTML = 'html';
 const SVG = 'svg';
@@ -303,7 +304,7 @@ export const node = ({
 }: {
     type: string;
     props: any;
-}) => {
+}, scope: RootScope, cursor?: HydrateCursor) => {
     const {
         $ref,
         $ns,
@@ -313,26 +314,33 @@ export const node = ({
         ...clearProps
     } = props;
 
-    // during active hydration reuse the existing server-rendered
-    // element (positional matching) instead of materialising a fresh one.
-    // Create a new element if queued element has not the same tag and namespace
-    const hydration = Renderer.getScope()?.hydration;
-    const hydratedNode = !!hydration?.queue
-        ? takeHydrateNode(hydration, {
-            tag: type, ns: NS[($ns || TAG_NS[type] || 'html') as keyof typeof NS]
-        }) : undefined;
+    // during active hydration reuse the existing server-rendered element
+    // instead of constructing a fresh one.
+    // A tag/namespace mismatch marks the cursor mismatch flag,
+    // so only this parent's remaining children are rebuilt
+    const hydratedNode = hydrateNode(cursor, {
+        tag: type, ns: NS[($ns || TAG_NS[type] || 'html') as keyof typeof NS]
+    });
     const node = (hydratedNode || createElement($ns, type, props && props.is ? {
         is: props.is
     } : undefined)) as unknown as (Node & TPreffXItem);
 
     // reactive node
     const clearNodeEffects = nodeEffects({node, props: clearProps})
-    // reactive children
-    const clearChildrenEffects = childrenEffects({root: node, children });
+    // children are constructed AFTER the parent element, and
+    // the hydration cursor is local to this element's `childNodes`
+    const childCursor = cursor ? createCursor(node) : undefined;
+    const childEffects = childrenEffects({
+        root: node as unknown as (Node & ParentNode),
+        children,
+        scope,
+        cursor: childCursor
+    });
+    const constructedChildren = childEffects.children;
 
     onMountCallback(node, () => {
         resolveRef($ref, node);
-        mount(children);
+        mount(constructedChildren);
         if ($onMount) {
             try {
                 $onMount(node);
@@ -343,8 +351,8 @@ export const node = ({
     });
 
     onDestroyCallback(node, () => {
-        destroy(children);
-        clearChildrenEffects();
+        destroy(constructedChildren);
+        childEffects.dispose();
         clearNodeEffects();
         resolveRef($ref);
         if ($onDestroy) {

@@ -292,6 +292,13 @@ export type PreffXUtils<C extends PreffXContext = PreffXContext> = {
         key?: string;
         keepPreviousState?: boolean;
     }) => Resource<T, E>;
+    /**
+     * Constructs component in the current component scope
+     * and return a value that can be awaited until it is rendered
+     * @param type - component function
+     * @param props - component props
+     */
+    resolve: (type: Function, props?: any) => any;
 
     // lifecycle
 
@@ -399,22 +406,37 @@ export type RootUtils = PreffXRootParams['utils'];
  */
 export type Env = {
     /**
-     * Create a text node
+     * Create a JSX node in the given scope
      */
-    text: (value: any) => any;
+    node: (args: { type: string; props: any }, scope: RootScope, cursor?: HydrateCursor) => any;
     /**
-     * Create a JSX node
+     * Create a component instance in the given scope
      */
-    node: (args: { type: string; props: any }) => any;
-    /**
-     * Create a component instance
-     */
-    component: (args: { type: Function; props: any }) => any;
+    component: (args: { type: Function; props: any }, scope: RootScope, cursor?: HydrateCursor) => any;
 };
 
 /**
- * Per-root execution scope. Created once per root in `createRoot`,
- * then passed down the tree via `withScope`.
+ * Positional hydration cursor
+ */
+export type HydrateCursor = {
+    /**
+     * DOM node whose children are being matched
+     */
+    parent: Node;
+    /**
+     * Local read position among `parent.childNodes`
+     */
+    index: number;
+    /**
+     * A tag/namespace mismatch flag
+     */
+    mismatch: boolean;
+};
+
+/**
+ * Per-root execution scope.
+ * Created once per root in `createRoot`,
+ * then passed down the tree explicitly as an argument
  */
 export type RootScope = {
     /**
@@ -461,24 +483,20 @@ export type RootScope = {
      * and shared down the tree by reference. Absent on the server.
      */
     hydration?: HydrationState;
+    /**
+     * Nearest enclosing Suspense boundary
+     */
+    boundary?: SuspenseBoundary;
 };
 
 /**
- * Per-root client-side hydration bookkeeping (positional DOM matching + preload data).
+ * Per-root client-side hydration bookkeeping (only the server-sent data)
  */
 export type HydrationState = {
     /**
      * Server-sent hydration data map (per-root preload payload)
      */
     data?: Record<string, unknown>;
-    /**
-     * Active hydration session: existing elements in walk order
-     */
-    queue?: Element[];
-    /**
-     * Read cursor into the current hydrate queue
-     */
-    index: number;
 };
 
 /**
@@ -533,12 +551,11 @@ export type Resources = Map<string, ResourceEntry>;
 export type SuspenseBoundary = {
     /** Resource keys created inside this boundary (nearest-wins, deduped). */
     keys: string[];
-    /** Client-side `pending` signals to aggregate for the fallback decision. */
-    pending: Array<ReadonlySignal<boolean>>;
+    /**
+     * Client-side `pending` signal of signals
+     */
+    pending: Signal<Array<ReadonlySignal<boolean>>>;
 };
-
-/** Active hydration session: existing DOM elements in walk order (positional matching) */
-export type HydrateQueue = Element[] | undefined;
 
 /**
  * Options accepted by `renderToString`.

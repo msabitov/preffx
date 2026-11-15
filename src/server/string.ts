@@ -3,7 +3,7 @@ import type { PC, APC, RootScope, SSRConfig, RenderToStringResult } from '../typ
 // common deps
 import { computed as preactComputed } from '../state';
 import { h } from '../h';
-import { Renderer } from '../utils/render';
+import { materialize } from '../vnode';
 // server deps
 import { jsxToStatic, serializeData } from './utils';
 
@@ -21,10 +21,8 @@ export const renderToString = (
     } = config;
     const resources = scope.resources!;
 
-    const root = Renderer.withRootScope({
-        scope,
-        callback: () => h(component as any, props)
-    });
+    // the root scope materializes VNode and pass scope explicitly
+    const root = materialize(h(component as any, props), scope);
     const promises = new Map<string, Promise<unknown>>();
 
     const preload = async (timeout?: number): Promise<void> => {
@@ -59,7 +57,7 @@ export const renderToString = (
     };
 
     const html = preactComputed(() => {
-        const body = jsxToStatic(root, resources);
+        const body = jsxToStatic(root, scope, resources);
         const data = serializeData(resources, serializer, scope.prefix);
         return `${body}${data}`;
     });

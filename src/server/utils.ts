@@ -1,12 +1,14 @@
 // common types
-import type { Resources } from '../types';
+import type { Resources, RootScope } from '../types';
 // common deps
 import { kebabCase, escapeHtml, resolveDeepRawValue, PREFFX_PRELOAD_ATTR } from '../utils/core';
+import { isVNode, materialize} from '../vnode';
 // server deps
 import type { SSRNode, SuspenseNode } from './node';
 
 export const NODE = 'node';
 export const SUSPENSE = 'suspense';
+export const TEXT_SEPARATOR = '<!--|-->';
 
 /** Serialize a style object/string into CSS text. */
 export const serializeStyle = (val: any): string => {
@@ -26,12 +28,18 @@ export type WalkFrame =
     | { kind: typeof SUSPENSE; node: SuspenseNode }
     | { kind: 'text'; value: unknown };
 
-/** Unwrap value into flat element / suspense / text frames */
-export function* resolveFrames(value: any): Generator<WalkFrame> {
+/**
+ * Unwrap value into flat element / suspense / text frames
+ */
+export function* resolveFrames(value: any, scope: RootScope): Generator<WalkFrame> {
     const r = resolveDeepRawValue(value);
     if (r === null || r === undefined || typeof r === 'boolean') return;
     if (Array.isArray(r)) {
-        for (const item of r) yield* resolveFrames(item);
+        for (const item of r) yield* resolveFrames(item, scope);
+        return;
+    }
+    if (isVNode(r)) {
+        yield* resolveFrames(materialize(r, scope), scope);
         return;
     }
     if (r && typeof r === 'object' && 'kind' in r) {
@@ -52,11 +60,17 @@ export const VOID_ELEMENTS = new Set([
     'link', 'meta', 'param', 'source', 'track', 'wbr'
 ]);
 
-/** Escape for attribute values (quotes + html entities) */
-export const escapeAttr = (s: string): string => escapeHtml(String(s)).replace(/"/g, '"');
+/**
+ * Escape for attribute values (quotes + html entities)
+ */
+export const escapeAttr = (s: string): string => escapeHtml(String(s))
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
-/** Render a single SSR-node attribute into markup */
-export const renderProp = (props: Record<string, any>, key: string, value: any): string => {
+/**
+ * Render a single SSR-node attribute into markup
+ */
+export const renderProp = (key: string, value: any): string => {
     // SSR never emits event listeners, node properties, children
     if (key === 'children' || key.startsWith('on') || key.startsWith('$')) return '';
     if (key === 'class') {
@@ -76,14 +90,16 @@ export const renderProp = (props: Record<string, any>, key: string, value: any):
     return ` ${attr}="${escapeAttr(String(value))}"`;
 };
 
-/** Render `<type attrs>` opening markup. */
+/**
+ * Render `<type attrs>` opening markup
+ */
 export const renderOpenTag = (node: SSRNode): string => {
     const { type, props } = node;
     let attrs = '';
     if (props && typeof props === 'object') {
         const resolvedProps = resolveDeepRawValue(props);
         for (const key of Object.keys(resolvedProps)) {
-            attrs += renderProp(resolvedProps, key, resolvedProps[key]);
+            attrs += renderProp(key, resolvedProps[key]);
         }
     }
     return `<${type}${attrs}>`;
@@ -95,33 +111,49 @@ export const isVoidTag = (tag: string): boolean => VOID_ELEMENTS.has(tag);
 /** Walk an SSR value tree, yielding HTML chunks */
 export function* walk(
     value: any,
-    resources: Resources | undefined
+    resources: Resources | undefined,
+    scope: RootScope
 ): Generator<string> {
-    for (const frame of resolveFrames(value)) {
+    // a chunk is text which does not start with '<',
+    // so '<' can never appear at the start of text
+    let prevWasText = false;
+    for (const frame of resolveFrames(value, scope)) {
         if (frame.kind === 'suspense') {
             const node = frame.node;
             const pendingKeys = node.keys.filter((k) => resources?.get(k)?.pending.value);
-            if (pendingKeys.length) {
-                yield* walk(node.fallback ?? null, resources);
-            } else {
-                yield* walk(node.children, resources);
+            const target = pendingKeys.length ? (node.fallback ?? null) : node.children;
+            // the boundary content is inlined,
+            // so its first/last chunk may be text that must be separated from neighbours
+            for (const chunk of walk(target, resources, scope)) {
+                if (!chunk) continue;
+                const isText = !chunk.startsWith('<');
+                if (isText && prevWasText) yield TEXT_SEPARATOR;
+                prevWasText = isText;
+                yield chunk;
             }
         } else if (frame.kind === NODE) {
             const node = frame.node;
             yield renderOpenTag(node);
+            prevWasText = false;
             if (!isVoidTag(node.type)) {
-                if (node.props?.children !== undefined) yield* walk(node.props.children, resources);
+                if (node.props?.children !== undefined) yield* walk(node.props.children, resources, scope);
                 yield `</${node.type}>`;
+                prevWasText = false;
             }
         } else {
-            yield escapeHtml(String(frame.value));
+            const text = escapeHtml(String(frame.value));
+            // empty values render nothing, so they must not consume a position
+            if (!text) continue;
+            if (prevWasText) yield TEXT_SEPARATOR;
+            prevWasText = true;
+            yield text;
         }
     }
 }
 
 /** Concatenate `walk` chunks into an HTML string. */
-export const jsxToStatic = (root: any, resources?: Resources): string =>
-    [...walk(root, resources)].reduce((acc, c) => acc + c, '');
+export const jsxToStatic = (root: any, scope: RootScope, resources?: Resources): string =>
+    [...walk(root, resources, scope)].reduce((acc, c) => acc + c, '');
 
 /** Escape JSON for a safe inline `<script>` embed */
 const escapeJsonScript = (s: string): string => s

@@ -28,6 +28,6 @@ export const resource = ({ scope, componentPrefix, computed }: ResourceContext) 
         }),
         pending: computed<boolean>(() => entry.pending.value)
     };
-    registerBoundary(key, res.pending as ResourceState['pending']);
+    registerBoundary(scope, key, res.pending as ResourceState['pending']);
     return [res, { refetch: mockHandler, mutate: mockHandler, cancel: mockHandler, invalidate: mockHandler }];
 };

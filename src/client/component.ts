@@ -1,5 +1,5 @@
 // common types
-import type { PC, SuspenseBoundary, SignalWithPrev } from '../types';
+import type { PC, SuspenseBoundary, SignalWithPrev, RootScope, HydrateCursor } from '../types';
 // common deps
 import {
     signal as preactSignal,
@@ -8,30 +8,37 @@ import {
     createModel,
     Signal,
     SignalOptions,
+    ReadonlySignal,
 } from '../state';
 import {
     destroy, mount, onMountCallback, onDestroyCallback, isPromise
 } from '../utils/core';
-import { Renderer } from '../utils/render';
-import { createComponent } from '../utils/component';
+import { createComponent, createFor } from '../utils/component';
+import { materialize } from '../vnode';
 // client deps
 import { childrenEffects } from './children';
 import { resource } from './resource';
 
 
-const Portal: PC<{
+/**
+ * `Portal` component factory
+ */
+const createPortal = (scope: RootScope): PC<{
     root: HTMLElement;
     children?: any | any[];
-}> = ({root, children}, {
+}> => ({root, children}, {
     onDestroy
 }) => {
     if (root) {
-        const clear = childrenEffects({ root, children });
-        mount(children);
+        // children are VNodes: materialize them in the component scope.
+        // A portal target is not part of the server markup, so no cursor.
+        const childrenState = childrenEffects({ root, children, scope });
+        const materialized = childrenState.children;
+        mount(materialized);
 
         onDestroy(() => {
-            clear();
-            destroy(children);
+            childrenState.dispose();
+            destroy(materialized);
             root.replaceChildren();
         });
     }
@@ -39,15 +46,19 @@ const Portal: PC<{
 };
 
 /**
- * `<Suspense>` boundary — a data boundary around resources
+ * `<Suspense>` component factory
  */
-const Suspense: PC<{
+const createSuspense = (scope: RootScope, cursor?: HydrateCursor): PC<{
     callback: () => any;
     fallback?: any;
-}> = ({ callback, fallback }, { computed }) => {
-    const boundary: SuspenseBoundary = { keys: [], pending: [] };
-    const content = Renderer.inBoundary(boundary, callback);
-    const pending = computed(() => boundary.pending.some((s) => s.value));
+}> => ({ callback, fallback }, { computed }) => {
+    const boundary: SuspenseBoundary = {
+        keys: [],
+        pending: preactSignal<Array<ReadonlySignal<boolean>>>([])
+    };
+    const childScope: RootScope = {...scope, boundary};
+    const content = materialize(callback(), childScope, cursor);
+    const pending = computed(() => boundary.pending.value.some((s) => s.value));
     return computed(() => (pending.value ? fallback : content));
 };
 
@@ -66,20 +77,12 @@ const signal = <T>(arg: T, options?: SignalOptions<T>): Signal<T> => {
 };
 
 const computed = <T>(fn: () => T, options?: SignalOptions<T>) => {
-    const scope = Renderer.getScope();
     const rawSignal = preactComputed(() => {
-        return Renderer.withScope({
-            scope,
-            callback: () => {
-                let result;
-                try {
-                    result = fn();
-                } catch (e) {
-                    result = e;
-                }
-                return result as T;
-            }
-        });
+        try {
+            return fn();
+        } catch (e) {
+            return e as T;
+        }
     }, options) as SignalWithPrev;
 
     preactEffect(() => {
@@ -92,23 +95,23 @@ const computed = <T>(fn: () => T, options?: SignalOptions<T>) => {
     return rawSignal;
 };
 
-const effect = (fn: () => any) => {
-    const scope = Renderer.getScope();
-    return preactEffect(() => Renderer.withScope({
-        scope,
-        callback: fn
-    }));
-};
+const effect = (fn: () => any) => preactEffect(fn);
 
 const ComponentModel = createModel<any, any>(({
-    type, props, utils
+    type, props, utils, scope, cursor
+}: {
+    type: Function;
+    props: any;
+    utils: any;
+    scope: RootScope;
+    cursor?: HydrateCursor;
 }) => {
     const controller = new AbortController();
     const abortSignal = controller.signal;
 
     let result;
     try {
-        result = type({...props}, utils);
+        result = materialize(type({...props}, utils), scope, cursor);
     } catch (e) {
         result = e;
     }
@@ -124,43 +127,60 @@ const ComponentModel = createModel<any, any>(({
     };
 
     if (isPromise(result)) {
-        result.then((r: any) => {
+        const settled = result.then((r: any) => {
             if (abortSignal.aborted) return;
             signalResult.prev = signalResult.value;
-            signalResult.value = r;
+            signalResult.value = materialize(r, scope);
+            return signalResult.value;
         }).catch((e: Error) => {
             if (abortSignal.aborted) return;
             signalResult.prev = signalResult.value;
             signalResult.value = e;
+            return e;
         });
 
-        signalResult.then = async (onFulfilled, _) => {
-            let awaitedValue;
-            if (isPromise(signalResult.value)) {
-                try {
-                    awaitedValue = await signalResult.value;
-                } catch (error) {
-                    awaitedValue = error;
-                } finally {
-                    signalResult.prev = signalResult.value;
-                    signalResult.value = awaitedValue;
-                    delete signalResult.then;
-                    onFulfilled(signalResult);
+        signalResult.then = (onFulfilled: any, onRejected: any) => {
+            const resolve = (value: any) => {
+                if (abortSignal.aborted) {
+                    onRejected?.(new Error('Component was destroyed'));
+                    return;
                 }
+                onFulfilled?.(value);
+            };
+            const reject = (error: any) => {
+                if (abortSignal.aborted) {
+                    onRejected?.(new Error('Component was destroyed'));
+                    return;
+                }
+                onRejected?.(error);
+            };
+            const current = signalResult.value;
+            // already settled
+            if (!isPromise(current)) {
+                if (current instanceof Error) reject(current);
+                else resolve(current);
+                return Promise.resolve();
             }
+            // wait for the model's own handler
+            return settled.then((value: any) => {
+                if (value instanceof Error) reject(value);
+                else resolve(value);
+            });
         }
     }
 
     return Object.defineProperty({}, 'root', {value: signalResult});
 });
 
-const render = ({ type, props, utils, callbacks }: {
+const render = ({ type, props, utils, scope, callbacks, cursor }: {
     type: Function;
     props: any;
     utils: any;
+    scope: RootScope;
     callbacks: { mount: Set<Function>; destroy: Set<Function> };
+    cursor?: HydrateCursor;
 }) => {
-    const componentModel = new ComponentModel({ type, props, utils });
+    const componentModel = new ComponentModel({ type, props, utils, scope, cursor });
     const componentRoot = componentModel.root;
     onMountCallback(componentRoot, () => {
         callbacks.mount.forEach((fn) => fn());
@@ -173,8 +193,9 @@ const render = ({ type, props, utils, callbacks }: {
 };
 
 export const component = createComponent({
-    Portal,
-    Suspense,
+    createPortal,
+    createSuspense,
+    createFor,
     resource,
     signal,
     computed,

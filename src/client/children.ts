@@ -1,10 +1,10 @@
 // common types
-import type { SignalWithPrev } from '../types';
+import type { SignalWithPrev, RootScope, HydrateCursor } from '../types';
 // common deps
 import { batch, createModel, effect, signal } from '../state';
 import { destroy, mount, isPromise, isSignal, isArray } from '../utils/core';
 // client deps
-import { resolveDeepValue } from '../client/utils';
+import { resolveToNodes, materializeValue, unwrapDeep } from '../client/utils';
 
 // only signal can be a reason to recomputation
 const deepReason = (arg: any): any => isSignal(arg) ? (
@@ -12,7 +12,7 @@ const deepReason = (arg: any): any => isSignal(arg) ? (
 ) : null;
 
 // DOM
-const updateChildren = (root: HTMLElement, items: Node[]) => {
+const updateChildren = (root: Node & ParentNode, items: Node[]) => {
     const nextChildNodes = items;
     const nextLength = nextChildNodes.length;
     const nextChildSet = new Set(nextChildNodes);
@@ -52,11 +52,17 @@ const updateChildren = (root: HTMLElement, items: Node[]) => {
 };
 
 // children reactivity
-const ChildrenModel = createModel<any, any>(({root, children}) => {
+const ChildrenModel = createModel<any, any>(({root, children, scope, cursor, setState}: {
+    root: Node & ParentNode;
+    children: any;
+    scope: RootScope;
+    cursor?: HydrateCursor;
+    setState: (state: object) => void;
+}) => {
     const childrenArray = children ?
         Array.isArray(children) ? children : [children] :
         [];
-    const cache = signal(new Map<any, Node[] | null>());
+    const cache = signal(new Map<any, any>());
     const mutations = new Set();
 
     const getNextCache = (key: any, val: any) => {
@@ -64,18 +70,25 @@ const ChildrenModel = createModel<any, any>(({root, children}) => {
         return nextMap.set(key, val);
     };
 
+    // hydration positions are only valid for the initial rendering
+    let hydrating = !!cursor;
+
     batch(() => childrenArray.forEach((item) => {
         // recalculates with effect if item is Signal
         effect(() => {
-            const value = resolveDeepValue(item);
+            const value = materializeValue(unwrapDeep(item), scope, hydrating ? cursor : undefined);
             cache.value = getNextCache(item, value);
             return () => {
+                destroy(value);
                 // value changed - cached is invalid
                 cache.peek().delete(item);
                 mutations.add(item);
             };
         });
     }));
+
+    // the initial rendering is over
+    hydrating = false;
 
     // children effect
     effect(() => {
@@ -84,10 +97,10 @@ const ChildrenModel = createModel<any, any>(({root, children}) => {
         if (childrenArray.length) {
             const currentChildren = childrenArray.reduce((acc, item: any) => {
                 const value = cacheMap.get(item);
-                if (value) acc.push(value);
+                if (value) acc.push(resolveToNodes(value, scope));
                 return acc;
             }, []);
-    
+
             const {added, removed} = [...mutations.values()].reduce((acc: any, signal) => {
                 const item = deepReason(signal);
                 if (item) {
@@ -117,11 +130,8 @@ const ChildrenModel = createModel<any, any>(({root, children}) => {
                 added: [],
                 removed: []
             }) as {added: any[]; removed: any[];};
-    
             if (root.isConnected && removed.length) destroy(removed);
-            
             updateChildren(root, currentChildren.flat(Infinity));
-    
             if (root.isConnected && added.length) mount(added);
         }
 
@@ -129,28 +139,32 @@ const ChildrenModel = createModel<any, any>(({root, children}) => {
         mutations.clear();
     });
 
-    effect(() => {
-        return () => {
-            const cachePeek = cache.peek();
-            for (const [_, val] of cachePeek) {
-                destroy(val);
-            }
-            // clear cache
-            cachePeek.clear();
-            // clear mutations
-            mutations.clear();
-        }
+    // initial materialized children,
+    // so the owner can mount/destroy them
+    setState({
+        children: childrenArray.reduce((acc: any[], item: any) => {
+            const value = cache.peek().get(item);
+            if (value) acc.push(value);
+            return acc;
+        }, [])
     });
 
     return {};
 });
 
 export const childrenEffects = ({
-    root, children
+    root, children, scope, cursor
 }: {
-    root: Node;
+    root: Node & ParentNode;
     children: any;
+    scope: RootScope;
+    cursor?: HydrateCursor;
 }) => {
-    const model = new ChildrenModel({root, children });
-    return model[Symbol.dispose];
+    let state: { children?: any } = {};
+    const setState = (nextState: typeof state) => state = nextState;
+    const model = new ChildrenModel({root, children, scope, cursor, setState });
+    return {
+        dispose: model[Symbol.dispose] as () => void,
+        children: state.children
+    };
 };

@@ -11,8 +11,7 @@ import { Renderer } from './utils/render';
 import { childrenEffects } from './client/children';
 import { component } from './client/component';
 import { node as createNode } from './client/node';
-import { createTextNode } from './client/utils';
-import { setHydratedData, withHydrateScope } from './client/hydration';
+import { setHydratedData, createCursor } from './client/hydration';
 
 export type { PC, APC };
 
@@ -24,17 +23,6 @@ export type { JSX } from './jsx';
 export { Fragment };
 
 export { h };
-
-/**
- * Collect every element under `root` in post-order
- * (children before their parent).
- */
-const collectPostOrder = (root: ParentNode, acc: Element[] = []): Element[] => [...root.children].reduce((acc, child) => {
-    collectPostOrder(child, acc);
-    if (child.hasAttribute?.(PREFFX_PRELOAD_ATTR)) return acc;
-    acc.push(child);
-    return acc;
-}, acc);
 
 /**
  * Create PreffX root
@@ -150,7 +138,7 @@ export function createRoot(params?: Omit<PreffXRootParams, 'utils'>) {
                 }
             };
             let hydrated: Record<string, unknown> | undefined;
-            let queue: Element[] | undefined;
+            let isHydrating = false;
             if (globalThis.document) {
                 // Per-root preload script scoped by the root prefix
                 let preloadedDataContainer: Element | null = null;
@@ -163,31 +151,29 @@ export function createRoot(params?: Omit<PreffXRootParams, 'utils'>) {
                 if (preloadedDataContainer) {
                     const data = deserialize(preloadedDataContainer.textContent || '');
                     if (data) {
+                        // existing server markup is hydrated in place
                         hydrated = data;
-                        // Positional queue of every existing element in build-order (post-order)
-                        queue = collectPostOrder(root);
+                        isHydrating = true;
                     }
                     preloadedDataContainer.remove();
                 }
             }
             const scope: RootScope = Renderer.resetScope(rootScope, {...rootContext});
-            scope.env = { node: createNode, component, text: createTextNode };
+            scope.env = { node: createNode, component };
             if (hydrated) {
-                const hydration = scope.hydration ?? (scope.hydration = { index: 0 });
+                const hydration = scope.hydration ?? (scope.hydration = {});
                 setHydratedData(hydration, hydrated);
             }
-            withHydrateScope(scope, queue, () => {
-                Renderer.withRootScope({
-                    scope,
-                    callback: () => {
-                        children = h(type, props);
-                        clearEffects = childrenEffects({
-                            root, children
-                        });
-                        mount(children);
-                    }
-                });
+            const cursor = isHydrating ? createCursor(root as Node) : undefined;
+            const rootEffects = childrenEffects({
+                root: root as Node & ParentNode,
+                children: h(type, props),
+                scope,
+                cursor
             });
+            children = rootEffects.children;
+            clearEffects = rootEffects.dispose;
+            mount(children);
         },
         /**
          * Destroy JSX

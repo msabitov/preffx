@@ -54,7 +54,7 @@ export function createRoot(
             config: SSRConfig = {}
         ): RenderToStringResult {
             const rootScope = reset();
-            rootScope.env = { node: serverNode, component: serverComponent, text: (arg) => '' + arg };
+            rootScope.env = { node: serverNode, component: serverComponent };
             return renderToString(component, config, rootScope);
         }
     };

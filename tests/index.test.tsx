@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { h, Fragment, createRoot, PC } from '../src/index';
+import { h, Fragment, createRoot, PC, APC } from '../src/index';
 
 function tick(ms: number = 0): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -1491,6 +1491,172 @@ describe('Hydrate existing DOM', () => {
 
         root.destroy();
     });
+
+    test('hydration cursor is local to each parent (nested siblings)', async () => {
+        const keyWrapper = 'key-wrapper';
+        const keyA = 'key-a';
+        const keyB = 'key-b';
+        const keyC = 'key-c';
+        const keyD = 'key-d';
+        const keyE = 'key-e';
+
+        hydRoot.innerHTML =
+            `<div id="${keyWrapper}">` +
+                `<div id="${keyA}">` +
+                    `<span id="${keyB}">1</span>` +
+                    `<span id="${keyC}">2</span>` +
+                '</div>' +
+                `<div id="${keyD}">` +
+                    `<span id="${keyE}">3</span>` +
+                '</div>' +
+            '</div>' +
+            '<script data-preffx-preload="app" type="application/json">{}</script>';
+
+        const refs = {
+            wrapper: hydRoot.querySelector('#' + keyWrapper)!,
+            a: hydRoot.querySelector('#' + keyA)!,
+            b: hydRoot.querySelector('#' + keyB)!,
+            c: hydRoot.querySelector('#' + keyC)!,
+            d: hydRoot.querySelector('#' + keyD)!,
+            e: hydRoot.querySelector('#' + keyE)!
+        };
+
+        const NestedApp: PC = () => h('div', {
+            id: keyWrapper,
+            children: [
+                h('div', {
+                    id: keyA,
+                    children: [
+                        h('span', { id: keyB, children: ['1'] }),
+                        h('span', { id: keyC, children: ['2'] })
+                    ]
+                }),
+                h('div', {
+                    id: keyD,
+                    children: [
+                        h('span', { id: keyE, children: ['3'] })
+                    ]
+                })
+            ]
+        });
+
+        const root = createRoot({ prefix: 'app' });
+        root.mount(NestedApp, { node: hydRoot });
+        await tick(0);
+
+        // Every level is matched against its own parent's childNodes,
+        // so a sibling subtree never shifts another
+        expect(hydRoot.querySelector('#' + keyWrapper)).toBe(refs.wrapper);
+        expect(hydRoot.querySelector('#' + keyA)).toBe(refs.a);
+        expect(hydRoot.querySelector('#' + keyB)).toBe(refs.b);
+        expect(hydRoot.querySelector('#' + keyC)).toBe(refs.c);
+        expect(hydRoot.querySelector('#' + keyD)).toBe(refs.d);
+        expect(hydRoot.querySelector('#' + keyE)).toBe(refs.e);
+
+        root.destroy();
+    });
+
+    test('adjacent dynamic texts hydrate across server separators', async () => {
+        const id = 'id';
+        hydRoot.innerHTML =
+            `<div id="${id}">a<!--|-->b</div>` +
+            '<script data-preffx-preload="app" type="application/json">{}</script>';
+
+        const element = hydRoot.querySelector('#' + id)!;
+        const [textA, , textB] = [...element.childNodes];
+
+        const TextApp: PC = () => h('div', {
+            id,
+            children: ['a', 'b']
+        });
+
+        const root = createRoot({ prefix: 'app' });
+        root.mount(TextApp, { node: hydRoot });
+        await tick(0);
+
+        expect(hydRoot.querySelector('#' + id)).toBe(element);
+        // both text nodes are the original server nodes, the separator is gone
+        expect(element.childNodes.length).toBe(2);
+        expect(element.childNodes[0]).toBe(textA);
+        expect(element.childNodes[1]).toBe(textB);
+        expect(element.textContent).toBe('ab');
+
+        root.destroy();
+    });
+
+    test('mismatch desyncs only its own parent, siblings keep hydrating', async () => {
+        hydRoot.innerHTML =
+            '<div id="a"><span id="a1">x</span></div>' +
+            '<div id="b"><span id="b1">y</span></div>' +
+            '<script data-preffx-preload="app" type="application/json">{}</script>';
+
+        const aEl = hydRoot.querySelector('#a')!;
+        const bEl = hydRoot.querySelector('#b')!;
+        const a1El = hydRoot.querySelector('#a1')!;
+        const b1El = hydRoot.querySelector('#b1')!;
+
+        const DesyncApp: PC = () => [
+            h('div', {
+                id: 'a',
+                children: [h('p', { id: 'p1', children: ['x'] })]
+            }),
+            h('div', {
+                id: 'b',
+                children: [h('span', { id: 'b1', children: ['y'] })]
+            })
+        ];
+
+        const root = createRoot({ prefix: 'app' });
+        root.mount(DesyncApp, { node: hydRoot });
+        await tick(0);
+
+        expect(hydRoot.querySelector('#a')).toBe(aEl);
+        expect(hydRoot.querySelector('#b')).toBe(bEl);
+        // the mismatched subtree was rebuilt
+        expect(hydRoot.querySelector('#a1')).toBeNull();
+        expect(hydRoot.querySelector('#p1')!.textContent).toBe('x');
+        expect(a1El.tagName.toLowerCase()).toBe('span');
+        // the sibling subtree kept its server node
+        expect(hydRoot.querySelector('#b1')).toBe(b1El);
+
+        root.destroy();
+    });
+
+    test('async children materialize outside the cursor (fresh nodes)', async () => {
+        hydRoot.innerHTML =
+            '<div id="app"><span id="sync">s</span></div>' +
+            '<script data-preffx-preload="app" type="application/json">{}</script>';
+
+        const appEl = hydRoot.querySelector('#app')!;
+        const syncEl = hydRoot.querySelector('#sync')!;
+
+        const AsyncChild: APC = async () => {
+            await tick(0);
+            return h('b', { id: 'async', children: ['a'] });
+        };
+
+        const AsyncApp: PC = () => h('div', {
+            id: 'app',
+            children: [
+                h('span', { id: 'sync', children: ['s'] }),
+                h(AsyncChild as any, {})
+            ]
+        });
+
+        const root = createRoot({ prefix: 'app' });
+        root.mount(AsyncApp, { node: hydRoot });
+        await tick(10);
+
+        // the synchronous part is hydrated in place
+        expect(hydRoot.querySelector('#app')).toBe(appEl);
+        expect(hydRoot.querySelector('#sync')).toBe(syncEl);
+        // the async part has no server markup, so it is created fresh
+        const asyncEl = hydRoot.querySelector('#async')!;
+        expect(asyncEl).not.toBeNull();
+        expect(asyncEl.textContent).toBe('a');
+
+        root.destroy();
+    });
 });
 
 describe('Attribute handling for JSX nodes', () => {
@@ -1745,6 +1911,298 @@ describe('Attribute handling for JSX nodes', () => {
         root.mount(C, { node: rootElement });
         await tick();
         expect((rootElement.firstElementChild as HTMLElement).title).toBe('hello');
+        root.destroy();
+    });
+});
+
+describe('Async component returning a promise (not wrapped in a signal)', () => {
+    let rootElement: HTMLDivElement;
+
+    beforeAll(() => {
+        rootElement = globalThis.document.createElement('div');
+        rootElement.id = 'async-app';
+        globalThis.document.body.appendChild(rootElement);
+
+        return () => {
+            rootElement.remove();
+        };
+    });
+
+    test('renders the resolved value', async () => {
+        const id = 'async-result';
+        // The component returns a Promise directly (not wrapped into a signal),
+        // so `ComponentModel` must await it and put the result into its signal.
+        const AsyncComponent: APC = async () => h('span', {
+            id,
+            children: [id]
+        });
+        const root = createRoot();
+        root.mount(AsyncComponent, { node: rootElement });
+        await tick();
+
+        expect(rootElement.querySelector('#' + id)?.textContent).toBe(id);
+        root.destroy();
+    });
+
+    test('renders the error when the promise rejects', async () => {
+        const id = 'async-error';
+        const AsyncComponent: APC = async () => {
+            throw new Error(id);
+        };
+        const root = createRoot();
+        root.mount(AsyncComponent, { node: rootElement });
+        await tick();
+
+        // the rejection is stored in the component signal instead of being
+        // thrown and rendered as a text node
+        expect(rootElement.textContent).toBe('Error: ' + id);
+        root.destroy();
+    });
+
+    test('async component rendered as a child resolves into the DOM', async () => {
+        const id = 'async-thenable';
+        const AsyncComponent: APC = async () => h('span', {
+            id,
+            children: [id]
+        });
+        // `h()` returns a VNode: render the async component as a child and let
+        // the owner materialize it. No `await <Component />` is needed.
+        const App: PC = () => h('div', {
+            children: [h(AsyncComponent, {})]
+        });
+        const root = createRoot();
+        root.mount(App, { node: rootElement });
+        await tick();
+
+        expect(rootElement.querySelector('#' + id)?.textContent).toBe(id);
+        root.destroy();
+    });
+
+    test('async component that throws renders the error as a child', async () => {
+        const id = 'async-reject';
+        const AsyncComponent: APC = async () => {
+            throw new Error(id);
+        };
+        const App: PC = () => h('div', {
+            children: [h(AsyncComponent, {})]
+        });
+        const root = createRoot();
+        root.mount(App, { node: rootElement });
+        await tick();
+
+        // the rejection is stored in the component signal and rendered as text
+        expect(rootElement.textContent).toContain('Error: ' + id);
+        root.destroy();
+    });
+
+    test('JSX created after await is rendered', async () => {
+        const id = 'jsx-after-await';
+        const AsyncComponent: APC = async () => {
+            await tick();
+            return h('span', { id, children: [id] });
+        };
+        const root = createRoot();
+        root.mount(AsyncComponent, { node: rootElement });
+        await tick(10);
+
+        expect(rootElement.querySelector('#' + id)?.textContent).toBe(id);
+        root.destroy();
+    });
+
+    test('two concurrent async components keep their own scope', async () => {
+        const seen: Array<{ name: string; id: string }> = [];
+
+        const make = (name: string, delay: number): APC => async (_, utils) => {
+            await tick(delay);
+            seen.push({ name, id: utils.id() });
+            return h('span', { id: name, children: [name] });
+        };
+
+        const Slow = make('slow', 15);
+        const Fast = make('fast', 5);
+
+        const App: PC = () => h('div', {
+            children: [h(Slow, {}), h(Fast, {})]
+        });
+
+        const root = createRoot();
+        root.mount(App, { node: rootElement });
+        await tick(40);
+
+        // both results render even though they settle out of order
+        expect(rootElement.querySelector('#slow')?.textContent).toBe('slow');
+        expect(rootElement.querySelector('#fast')?.textContent).toBe('fast');
+        // ids must be distinct and stable per component
+        expect(new Set(seen.map((s) => s.id)).size).toBe(2);
+        root.destroy();
+    });
+
+    test('utils.computed created after await is rendered', async () => {
+        const id = 'computed-after-await';
+        const AsyncComponent: APC = async (_, utils) => {
+            await tick();
+            const c = utils.computed(() => h('span', { id, children: ['computed'] }));
+            return h('div', { children: [c] });
+        };
+        const root = createRoot();
+        root.mount(AsyncComponent, { node: rootElement });
+        await tick(10);
+
+        expect(rootElement.querySelector('#' + id)?.textContent).toBe('computed');
+        root.destroy();
+    });
+
+    test('async component renders a child component without await', async () => {
+        const id = 'child-after-await';
+        const Child: PC = () => h('span', { id, children: ['child'] });
+        const AsyncComponent: APC = async () => {
+            await tick();
+            return h(Child, {});
+        };
+        const root = createRoot();
+        root.mount(AsyncComponent, { node: rootElement });
+        await tick(20);
+
+        expect(rootElement.querySelector('#' + id)?.textContent).toBe('child');
+        root.destroy();
+    });
+
+    test('resolve() awaits a sync child and returns its node', async () => {
+        const id = 'resolve-sync';
+        const Child: PC = () => h('span', { id, children: ['sync'] });
+        let child: any;
+        const Parent: APC = async (_, { resolve }) => {
+            await tick();
+            child = await resolve(Child, {});
+            return h('div', { children: [child] });
+        };
+        const root = createRoot();
+        root.mount(Parent, { node: rootElement });
+        await tick(20);
+
+        expect(child).toBeInstanceOf(Node);
+        expect((child as Node).textContent).toBe('sync');
+        expect(rootElement.querySelector('#' + id)?.textContent).toBe('sync');
+        root.destroy();
+    });
+
+    test('resolve() awaits an async child until it is rendered', async () => {
+        const id = 'resolve-async';
+        const Child: APC = async () => {
+            await tick(5);
+            return h('span', { id, children: ['async'] });
+        };
+        let child: any;
+        const Parent: APC = async (_, { resolve }) => {
+            await tick();
+            child = await resolve(Child, {});
+            return h('div', { children: [child] });
+        };
+        const root = createRoot();
+        root.mount(Parent, { node: rootElement });
+        await tick(40);
+
+        expect(child).toBeInstanceOf(Node);
+        expect((child as Node).textContent).toBe('async');
+        expect(rootElement.querySelector('#' + id)?.textContent).toBe('async');
+        root.destroy();
+    });
+
+    test('resolve() rethrows a throwing child', async () => {
+        const Child: PC = () => {
+            throw new Error('resolve-boom');
+        };
+        let caught: any;
+        const Parent: APC = async (_, { resolve }) => {
+            await tick();
+            try {
+                await resolve(Child, {});
+            } catch (e) {
+                caught = e;
+            }
+            return null;
+        };
+        const root = createRoot();
+        root.mount(Parent, { node: rootElement });
+        await tick(20);
+
+        expect(caught).toBeInstanceOf(Error);
+        expect((caught as Error).message).toBe('resolve-boom');
+        root.destroy();
+    });
+
+    test('resolve() child is destroyed with its owner even if never inserted', async () => {
+        const log: string[] = [];
+        const Child: PC = (_, { onDestroy }) => {
+            onDestroy(() => log.push('child'));
+            return h('span', { children: ['orphan'] });
+        };
+        const Parent: APC = async (_, { resolve }) => {
+            await tick();
+            // created but never returned into the tree
+            await resolve(Child, {});
+            return null;
+        };
+        const root = createRoot();
+        root.mount(Parent, { node: rootElement });
+        await tick(20);
+
+        expect(log).toEqual([]);
+        root.destroy();
+        await tick();
+
+        expect(log).toEqual(['child']);
+    });
+
+    test('async component nested in a sync component renders in place', async () => {
+        const AsyncChild: APC = async () => {
+            await tick(5);
+            return h('span', { id: 'nested-async', children: ['nested'] });
+        };
+        const SyncParent: PC = () => h('div', {
+            children: [
+                h('span', { id: 'before', children: ['before'] }),
+                h(AsyncChild, {}),
+                h('span', { id: 'after', children: ['after'] })
+            ]
+        });
+        const root = createRoot();
+        root.mount(SyncParent, { node: rootElement });
+        await tick(20);
+
+        const container = rootElement.firstElementChild as HTMLElement;
+        expect(container.querySelector('#nested-async')?.textContent).toBe('nested');
+        expect(container.querySelector('#before')?.textContent).toBe('before');
+        expect(container.querySelector('#after')?.textContent).toBe('after');
+        // the async result is inserted between the siblings, not appended
+        expect(Array.from(container.children).map((el) => el.id))
+            .toEqual(['before', 'nested-async', 'after']);
+        root.destroy();
+    });
+
+    test('async component nested in a sync component stays reactive after await', async () => {
+        // Signals created after `await` inside the async child must still be
+        // bound to the child's own scope and update the DOM.
+        const AsyncChild: APC = async (_, { signal }) => {
+            await tick(5);
+            const count = signal(0);
+            const button = h('button', {
+                id: 'nested-btn',
+                onClick: () => count.value++,
+                children: ['inc']
+            });
+            const value = h('span', { id: 'nested-count', children: [count] });
+            return h('div', { children: [value, button] });
+        };
+        const SyncParent: PC = () => h('div', { children: [h(AsyncChild, {})] });
+        const root = createRoot();
+        root.mount(SyncParent, { node: rootElement });
+        await tick(20);
+
+        expect(rootElement.querySelector('#nested-count')?.textContent).toBe('0');
+        (rootElement.querySelector('#nested-btn') as HTMLElement).click();
+        await tick();
+        expect(rootElement.querySelector('#nested-count')?.textContent).toBe('1');
         root.destroy();
     });
 });

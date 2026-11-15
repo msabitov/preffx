@@ -5,6 +5,29 @@ All notable changes to [PreffX](https://github.com/msabitov/preffx) are document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-11-15
+
+### Added
+
+- the `resolve` utility added — it materializes an async component in the current component scope and returns its node, so `await resolve(Component, props)` waits for async children
+
+### Fixed
+
+- `onMount` / `onDestroy` now fire for the whole tree: component children are handed to their owner, so lifecycle callbacks are no longer skipped
+- JSX created after `await` inside an async component is now rendered (previously the ambient scope was already restored to `undefined`)
+- two concurrent async components no longer share or lose each other's scope
+- `resource()` created after `await` registers in the enclosing `Suspense` boundary, so its pending state still toggles the fallback
+- hydration now matches server markup positionally per parent: a mismatch desyncs only its own parent, and adjacent dynamic text nodes are separated on the server with `<!--|-->` so they hydrate correctly
+- server markup is now actually escaped (`&`, `<`, `>`, quotes) — previously the escaping was broken
+- `For` and reactive children destroy their nodes when an item is removed or the owner is destroyed
+- fixed typos in the examples in the README
+
+### Changed
+
+- **breaking:** `h()` now returns a `VNode` description instead of a DOM `Node`. Nodes are created by the internal step, which receives the scope explicitly. As a result `h()` is clear and no longer throws outside a PreffX root
+- `Defer` accepts a `ReadonlySignal`, so a `computed` can be passed as `value`
+- mount and destroy logic was unified to ensure that callbacks are invoked exactly once
+
 ## [0.9.3] - 2026-11-08
 
 ### Fixed
@@ -240,7 +263,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.9.3]: https://github.com/msabitov/preffx
+[0.10.0]: https://github.com/msabitov/preffx
+[0.9.3]: https://github.com/msabitov/preffx/commit/ff94e9a924578cd00275633ef504e14c28e6cdfa
 [0.9.2]: https://github.com/msabitov/preffx/commit/ce2889a5c19dfd4abe47c65c19c1b52725d7fd88
 [0.9.1]: https://github.com/msabitov/preffx/commit/1eca6a6a8e784005d66a289e0fb63850c1fb9d2f
 [0.9.0]: https://github.com/msabitov/preffx/commit/58d9c0e6a2461f9b7d78fca7c8acaa1c7fb0d99e

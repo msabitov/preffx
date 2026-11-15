@@ -107,7 +107,7 @@ export const App: PC = (props, { signal }) => {
 import type { PC } from 'preffx';
 
 export const App: PC = (props, { signal }) => {
-    const signalRef = signal();
+    const signalRef = signal<HTMLDivElement | null>(null);
     return <div $ref={signalRef}>
         <div
             $ref={(refVal) => {
@@ -117,12 +117,12 @@ export const App: PC = (props, { signal }) => {
             $onMount={(refVal) => {
                 // it will be called after element mounted with refVal = HTMLDivElement
             }}
-            $onDestroy={() => {
+            $onDestroy={(refVal) => {
                 // it will be called before element destroyed with refVal = HTMLDivElement
             }}
         >
             Refs
-        </button>
+        </div>
     </div>
 };
 ```
@@ -157,7 +157,7 @@ export const App: PC = (props, { onMount, onDestroy }) => {
 ```tsx
 import type { PC } from 'preffx';
 
-export const App: PC = (props, { For }) => {
+export const App: PC = (props, { signal, For }) => {
     const items = signal([
         {
             name: 'First'
@@ -197,7 +197,7 @@ export const App: PC = (props, { signal, context }) => {
     // modify context
     context[contextKey] = counter;
     return <p>
-        {valueFromContext}
+        {counter}
         <AnotherComponent />
     </p>;
 };
@@ -212,15 +212,21 @@ import { AnotherComponent, AnotherAsyncComponent } from './components';
 
 const AsyncComponent: APC<{
     name: string;
-}> = async (props, utils) => {
+}> = async (props, { resolve }) => {
     const data = await getData()
-    const componentRoot = await <AnotherAsyncComponent name='nested'/>;
+    // `resolve` materializes a child in the current component scope
+    // and returns its node, so `await` waits for async children too
+    const componentRoot = await resolve(AnotherAsyncComponent, { name: 'nested' });
     return <div>
         <AnotherComponent data={data} />
         {componentRoot}
     </div>;
 }
 ```
+
+> `resolve` is only needed when you want the child's node in hand or must wait for an
+> async child before continuing. A plain child can be inserted directly.
+> Note that `await <Child />` does **not** work.
 
 - Error handling:
 
